@@ -34,6 +34,17 @@ export const actions: Actions = {
 		return { savedHousehold: id };
 	},
 
+	setCapacity: async ({ request, locals }) => {
+		const form = await request.formData();
+		const capacity = Number(form.get('capacity'));
+		if (![25, 50, 75, 100].includes(capacity)) return fail(400);
+		await db
+			.update(users)
+			.set({ capacityPercent: capacity })
+			.where(eq(users.id, locals.user!.id));
+		return { capacitySaved: true };
+	},
+
 	changePassword: async ({ request, locals }) => {
 		const form = await request.formData();
 		const current = String(form.get('current') ?? '');

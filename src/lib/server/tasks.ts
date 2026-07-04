@@ -28,14 +28,36 @@ async function loadTaskContext(taskId: number) {
 	return row;
 }
 
-async function advanceOrArchive(row: NonNullable<Awaited<ReturnType<typeof loadTaskContext>>>, today: string) {
+/** Who a task effectively belongs to right now (assignee > rotation turn > area owner). */
+export function effectiveResponsible(
+	task: { assignedUserId: number | null; rotate: boolean; nextTurnUserId: number | null },
+	areaOwnerUserId: number | null
+): number | null {
+	return task.assignedUserId ?? (task.rotate ? task.nextTurnUserId : null) ?? areaOwnerUserId;
+}
+
+async function advanceOrArchive(
+	row: NonNullable<Awaited<ReturnType<typeof loadTaskContext>>>,
+	today: string,
+	doerId: number | null
+) {
+	// Round-robin: the turn passes to whoever didn't just do it
+	let nextTurnUserId = row.task.nextTurnUserId;
+	if (row.task.rotate) {
+		const pair = await db.select({ id: users.id }).from(users).orderBy(users.id).limit(2);
+		const handOffFrom = doerId ?? row.task.nextTurnUserId ?? pair[0]?.id;
+		nextTurnUserId = pair.find((u) => u.id !== handOffFrom)?.id ?? null;
+	}
 	if (row.task.isRecurring) {
 		await db
 			.update(tasks)
-			.set({ nextDueDate: advanceDueDate(row.task, today) })
+			.set({ nextDueDate: advanceDueDate(row.task, today), nextTurnUserId })
 			.where(eq(tasks.id, row.task.id));
 	} else {
-		await db.update(tasks).set({ archivedAt: new Date() }).where(eq(tasks.id, row.task.id));
+		await db
+			.update(tasks)
+			.set({ archivedAt: new Date(), nextTurnUserId })
+			.where(eq(tasks.id, row.task.id));
 	}
 }
 
@@ -59,7 +81,7 @@ export async function completeTask(taskId: number, doer: Doer): Promise<Complete
 	const today = localToday(row.household.timezone);
 	const due = row.task.nextDueDate;
 	const onTime = due === null || today <= due;
-	const responsible = row.task.assignedUserId ?? row.area.ownerUserId;
+	const responsible = effectiveResponsible(row.task, row.area.ownerUserId);
 	const coveredForUserId = responsible !== null && responsible !== doer.id ? responsible : null;
 
 	await db.insert(completions).values({
@@ -68,9 +90,11 @@ export async function completeTask(taskId: number, doer: Doer): Promise<Complete
 		dueDate: due,
 		onTime,
 		pointsAwarded: row.task.points,
+		minutes: row.task.estimatedMinutes,
+		dread: row.task.dread,
 		coveredForUserId
 	});
-	await advanceOrArchive(row, today);
+	await advanceOrArchive(row, today, doer.id);
 	const levelResult = await checkLevelUp(row.task.points);
 
 	// Celebrate to the partner — a push failure must never fail the completion
@@ -113,6 +137,7 @@ export async function completeTaskTogether(taskId: number): Promise<CompleteResu
 	const due = row.task.nextDueDate;
 	const onTime = due === null || today <= due;
 	const half = Math.floor(row.task.points / 2);
+	const halfMinutes = Math.floor(row.task.estimatedMinutes / 2);
 
 	await db.insert(completions).values(
 		pair.map((person, i) => ({
@@ -121,10 +146,12 @@ export async function completeTaskTogether(taskId: number): Promise<CompleteResu
 			dueDate: due,
 			onTime,
 			pointsAwarded: i === 0 ? row.task.points - half : half,
+			minutes: i === 0 ? row.task.estimatedMinutes - halfMinutes : halfMinutes,
+			dread: row.task.dread,
 			coveredForUserId: null
 		}))
 	);
-	await advanceOrArchive(row, today);
+	await advanceOrArchive(row, today, null);
 	const levelResult = await checkLevelUp(row.task.points);
 
 	try {

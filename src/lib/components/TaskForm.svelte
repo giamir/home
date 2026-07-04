@@ -13,6 +13,9 @@
 		title: string;
 		notes: string | null;
 		points: number;
+		estimatedMinutes?: number;
+		dread?: boolean;
+		rotate?: boolean;
 		assignedUserId: number | null;
 		isRecurring: boolean;
 		recurrenceInterval: number | null;
@@ -38,6 +41,7 @@
 	let isRecurring = $state(task?.isRecurring ?? false);
 	let assigned = $state(task?.assignedUserId ? String(task.assignedUserId) : '');
 	let points = $state(task?.points ?? 10);
+	let minutes = $state(task?.estimatedMinutes ?? 15);
 </script>
 
 <form
@@ -80,9 +84,38 @@
 	</div>
 
 	<div>
+		<div class="mb-1 text-xs font-medium text-stone-500">Effort (minutes)</div>
+		<div class="flex gap-2">
+			{#each [5, 15, 30, 60] as value (value)}
+				<label
+					class="flex-1 cursor-pointer rounded-xl border-2 py-1.5 text-center text-sm font-semibold
+						{minutes === value ? 'border-accent-500 bg-accent-50' : 'border-stone-200'}"
+				>
+					<input type="radio" name="estimatedMinutes" {value} bind:group={minutes} class="sr-only" />
+					{value}m
+				</label>
+			{/each}
+		</div>
+	</div>
+
+	<div>
 		<div class="mb-1 text-xs font-medium text-stone-500">Who's responsible?</div>
 		<OwnerSelect {users} name="assignedUserId" bind:selected={assigned} sharedLabel="Area owner" />
 	</div>
+
+	{#if assigned === ''}
+		<label class="flex items-center gap-2 text-sm font-medium">
+			<input type="checkbox" name="rotate" checked={task?.rotate ?? false} class="size-4 accent-emerald-700" />
+			🔁 Take turns
+			<span class="text-xs font-normal text-stone-500">(flips after each completion)</span>
+		</label>
+	{/if}
+
+	<label class="flex items-center gap-2 text-sm font-medium">
+		<input type="checkbox" name="dread" checked={task?.dread ?? false} class="size-4 accent-emerald-700" />
+		😖 Nobody wants this one
+		<span class="text-xs font-normal text-stone-500">(tracked in the yuck balance)</span>
+	</label>
 
 	<div class="flex items-center justify-between gap-3">
 		<label class="flex items-center gap-2 text-sm font-medium">

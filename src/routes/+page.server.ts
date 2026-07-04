@@ -7,8 +7,10 @@ import {
 	completeTask,
 	completeTaskTogether,
 	completionLocalDate,
+	effectiveResponsible,
 	uncompleteTask
 } from '$lib/server/tasks';
+import { addCredit, getCreditsSince } from '$lib/server/credits';
 import { getReactions, toggleReaction } from '$lib/server/reactions';
 import { computeStreak, weeklyScore } from '$lib/server/gamification';
 import { addToDate, localHour, localToday } from '$lib/dates';
@@ -29,6 +31,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			nextDueDate: tasks.nextDueDate,
 			isRecurring: tasks.isRecurring,
 			assignedUserId: tasks.assignedUserId,
+			rotate: tasks.rotate,
+			nextTurnUserId: tasks.nextTurnUserId,
 			areaOwnerUserId: areas.ownerUserId,
 			areaId: areas.id,
 			areaName: areas.name
@@ -42,7 +46,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const withResponsible = taskRows.map((t) => ({
 		...t,
-		responsibleId: t.assignedUserId ?? t.areaOwnerUserId
+		responsibleId: effectiveResponsible(t, t.areaOwnerUserId),
+		isTurn: t.rotate && t.nextTurnUserId !== null
 	}));
 
 	// Streaks for the recurring tasks on screen
@@ -65,17 +70,32 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	// Weekly head-to-head (completions from both houses)
 	const allUsers = await db
-		.select({ id: users.id, displayName: users.displayName, emoji: users.emoji })
+		.select({
+			id: users.id,
+			displayName: users.displayName,
+			emoji: users.emoji,
+			capacityPercent: users.capacityPercent
+		})
 		.from(users)
 		.orderBy(users.id);
-	const recent = await db
-		.select()
-		.from(completions)
-		.where(gte(completions.completedAt, new Date(Date.now() - 9 * 86_400_000)));
-	const recentLocal = recent.map((c) => ({
-		...c,
-		localDate: completionLocalDate(c.completedAt, household.timezone)
-	}));
+	const cutoff = new Date(Date.now() - 9 * 86_400_000);
+	const [recent, recentCredits] = await Promise.all([
+		db.select().from(completions).where(gte(completions.completedAt, cutoff)),
+		getCreditsSince(cutoff)
+	]);
+	const recentLocal = [
+		...recent.map((c) => ({
+			...c,
+			localDate: completionLocalDate(c.completedAt, household.timezone)
+		})),
+		...recentCredits.map((c) => ({
+			userId: c.userId,
+			pointsAwarded: c.points,
+			coveredForUserId: null,
+			onTime: true,
+			localDate: completionLocalDate(c.createdAt, household.timezone)
+		}))
+	];
 	const score = weeklyScore(recentLocal, today);
 	const doneToday: Record<number, number> = {};
 	for (const c of recentLocal) {
@@ -176,7 +196,7 @@ export const actions: Actions = {
 		await toggleReaction(completionId, locals.user!, emoji);
 		return {};
 	},
-	quickAdd: async ({ request }) => {
+	quickAdd: async ({ request, locals }) => {
 		const form = await request.formData();
 		const title = String(form.get('title') ?? '').trim();
 		const areaId = Number(form.get('areaId'));
@@ -193,9 +213,11 @@ export const actions: Actions = {
 			areaId,
 			title,
 			points,
+			estimatedMinutes: Math.min(points * 2, 120),
 			isRecurring: false,
 			nextDueDate: dueToday ? localToday(area.timezone) : null
 		});
+		await addCredit(locals.user!.id, 2, 'noticed');
 		return { quickAdded: true };
 	}
 };

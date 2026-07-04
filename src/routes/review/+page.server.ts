@@ -4,6 +4,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { areas, households, tasks } from '$lib/server/db/schema';
 import { completeTask, completeTaskTogether } from '$lib/server/tasks';
+import { addCredit } from '$lib/server/credits';
 import { addToDate, daysBetween, localToday } from '$lib/dates';
 
 export const load: PageServerLoad = async () => {
@@ -88,7 +89,7 @@ export const actions: Actions = {
 
 	// Honest snooze: recurring tasks jump one full cadence from today,
 	// one-offs get a week
-	skip: async ({ request }) => {
+	skip: async ({ request, locals }) => {
 		const form = await request.formData();
 		const taskId = Number(form.get('taskId'));
 		if (!Number.isInteger(taskId)) return fail(400);
@@ -99,23 +100,26 @@ export const actions: Actions = {
 			? addToDate(today, row.task.recurrenceInterval ?? 1, row.task.recurrenceUnit ?? 'week')
 			: addToDate(today, 1, 'week');
 		await db.update(tasks).set({ nextDueDate: next }).where(eq(tasks.id, taskId));
+		await addCredit(locals.user!.id, 1, 'review');
 		return {};
 	},
 
-	reschedule: async ({ request }) => {
+	reschedule: async ({ request, locals }) => {
 		const form = await request.formData();
 		const taskId = Number(form.get('taskId'));
 		const date = String(form.get('date') ?? '');
 		if (!Number.isInteger(taskId) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return fail(400);
 		await db.update(tasks).set({ nextDueDate: date }).where(eq(tasks.id, taskId));
+		await addCredit(locals.user!.id, 1, 'review');
 		return {};
 	},
 
-	retire: async ({ request }) => {
+	retire: async ({ request, locals }) => {
 		const form = await request.formData();
 		const taskId = Number(form.get('taskId'));
 		if (!Number.isInteger(taskId)) return fail(400);
 		await db.update(tasks).set({ archivedAt: new Date() }).where(eq(tasks.id, taskId));
+		await addCredit(locals.user!.id, 1, 'review');
 		return {};
 	}
 };

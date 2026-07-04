@@ -28,6 +28,8 @@ export const users = pgTable('users', {
 	emoji: text('emoji').notNull().default('🙂'),
 	passwordHash: text('password_hash').notNull(),
 	currentHouseholdId: smallint('current_household_id').references(() => households.id),
+	// "I'm at 30% this week" — fairness is judged against capacity, not 50/50
+	capacityPercent: smallint('capacity_percent').notNull().default(100),
 	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow()
 });
 
@@ -79,7 +81,12 @@ export const tasks = pgTable(
 		title: text('title').notNull(),
 		notes: text('notes'),
 		points: smallint('points').notNull().default(10),
+		estimatedMinutes: smallint('estimated_minutes').notNull().default(15),
+		dread: boolean('dread').notNull().default(false), // 😖 nobody wants this one
 		assignedUserId: smallint('assigned_user_id').references(() => users.id), // NULL = area owner
+		// Round-robin for shared tasks: whose turn it is flips after each completion
+		rotate: boolean('rotate').notNull().default(false),
+		nextTurnUserId: smallint('next_turn_user_id').references(() => users.id),
 		isRecurring: boolean('is_recurring').notNull().default(false),
 		recurrenceInterval: smallint('recurrence_interval'),
 		recurrenceUnit: text('recurrence_unit', { enum: ['day', 'week', 'month'] }),
@@ -110,6 +117,8 @@ export const completions = pgTable(
 		dueDate: date('due_date'),
 		onTime: boolean('on_time').notNull(),
 		pointsAwarded: smallint('points_awarded').notNull(),
+		minutes: smallint('minutes').notNull().default(15), // effort snapshot
+		dread: boolean('dread').notNull().default(false),
 		// Set when the doer wasn't the responsible person at completion time.
 		coveredForUserId: smallint('covered_for_user_id').references(() => users.id)
 	},
@@ -134,6 +143,33 @@ export const completionReactions = pgTable(
 	},
 	(t) => [uniqueIndex('completion_reactions_one_per_user').on(t.completionId, t.userId)]
 );
+
+// Monthly "how fair did this month feel?" — revealed only when both answered
+export const checkins = pgTable(
+	'checkins',
+	{
+		id: serial('id').primaryKey(),
+		userId: smallint('user_id')
+			.notNull()
+			.references(() => users.id),
+		month: text('month').notNull(), // 'YYYY-MM'
+		rating: smallint('rating').notNull(), // 1-5
+		note: text('note'),
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow()
+	},
+	(t) => [uniqueIndex('checkins_one_per_month').on(t.userId, t.month)]
+);
+
+// Mental-load credit: small points for the noticing/planning work
+export const credits = pgTable('credits', {
+	id: serial('id').primaryKey(),
+	userId: smallint('user_id')
+		.notNull()
+		.references(() => users.id),
+	points: smallint('points').notNull(),
+	reason: text('reason', { enum: ['noticed', 'review'] }).notNull(),
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow()
+});
 
 export const pushSubscriptions = pgTable('push_subscriptions', {
 	id: serial('id').primaryKey(),

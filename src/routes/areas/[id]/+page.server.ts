@@ -11,6 +11,7 @@ import {
 	users
 } from '$lib/server/db/schema';
 import { completeTask, uncompleteTask } from '$lib/server/tasks';
+import { addCredit } from '$lib/server/credits';
 import { getReactions, toggleReaction } from '$lib/server/reactions';
 import { computeStreak } from '$lib/server/gamification';
 import { localToday } from '$lib/dates';
@@ -210,11 +211,12 @@ export const actions: Actions = {
 		return {};
 	},
 
-	addTask: async ({ params, request }) => {
+	addTask: async ({ params, request, locals }) => {
 		const form = await request.formData();
 		const values = taskFormValues(form);
 		if (!values.title) return fail(400, { message: 'Title required' });
 		await db.insert(tasks).values({ areaId: Number(params.id), ...values });
+		await addCredit(locals.user!.id, 2, 'noticed');
 		return {};
 	},
 
@@ -276,6 +278,9 @@ function taskFormValues(form: FormData) {
 		title: String(form.get('title') ?? '').trim(),
 		notes: String(form.get('notes') ?? '').trim() || null,
 		points: Number(form.get('points')) || 10,
+		estimatedMinutes: Number(form.get('estimatedMinutes')) || 15,
+		dread: form.get('dread') === 'on',
+		rotate: form.get('rotate') === 'on' && !form.get('assignedUserId'),
 		assignedUserId: form.get('assignedUserId') ? Number(form.get('assignedUserId')) : null,
 		isRecurring,
 		recurrenceInterval: isRecurring ? Number(form.get('recurrenceInterval')) || 1 : null,

@@ -55,7 +55,8 @@ export const GET: RequestHandler = async ({ request }) => {
 		for (const { task, area } of dueTasks) {
 			const targets = resolveReminderTargets(
 				{
-					assignedUserId: task.assignedUserId,
+					// Rotation turn acts as the assignee for targeting
+					assignedUserId: task.assignedUserId ?? (task.rotate ? task.nextTurnUserId : null),
 					areaOwnerUserId: area.ownerUserId,
 					remindWhenAway: task.remindWhenAway,
 					householdId: household.id

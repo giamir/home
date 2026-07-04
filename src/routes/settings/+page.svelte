@@ -24,6 +24,31 @@
 	<NotificationSettings />
 </div>
 
+<!-- Capacity: fairness is judged against real life, not rigid 50/50 -->
+<div class="mb-3 rounded-2xl bg-white p-4 shadow-sm">
+	<h2 class="mb-1 text-sm font-semibold text-stone-500">🔋 My capacity this week</h2>
+	<p class="mb-3 text-sm text-stone-600">
+		Big work week or travelling? Lower it — the balance meter judges against what's realistic.
+	</p>
+	<form method="post" action="?/setCapacity" use:enhance class="flex gap-2">
+		{#each [25, 50, 75, 100] as capacity (capacity)}
+			<button
+				name="capacity"
+				value={capacity}
+				class="flex-1 rounded-xl border-2 py-2 text-sm font-semibold
+					{data.user?.capacityPercent === capacity
+					? 'border-accent-500 bg-accent-50'
+					: 'border-stone-200'}"
+			>
+				{capacity}%
+			</button>
+		{/each}
+	</form>
+	{#if form?.capacitySaved}
+		<p class="mt-2 text-sm text-accent-700">Saved ✓</p>
+	{/if}
+</div>
+
 <!-- Households -->
 <div class="mb-3 flex flex-col gap-3">
 	{#each data.households as household (household.id)}

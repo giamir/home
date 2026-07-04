@@ -149,6 +149,14 @@
 	</section>
 {/if}
 
+<a
+	href="/draft"
+	class="mb-5 flex items-center justify-center gap-2 rounded-2xl border border-dashed
+		border-stone-400 p-3 text-sm font-medium text-stone-600"
+>
+	🏈 Draft the week's chores together
+</a>
+
 {#if data.preview.length > 0}
 	<section class="mb-5">
 		<h2 class="mb-2 text-sm font-semibold text-stone-500">Next 7 days</h2>

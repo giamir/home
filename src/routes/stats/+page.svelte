@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { Crown, Flame, HandHeart, Trophy } from '@lucide/svelte';
 
 	let { data } = $props();
@@ -38,23 +39,37 @@
 
 	const goalPct = $derived(Math.min(100, (data.thisWeek.team / data.weeklyGoal) * 100));
 
-	// Workload balance this week, framed warmly
+	function hours(minutes: number) {
+		if (minutes < 60) return `${minutes}m`;
+		return `${Math.floor(minutes / 60)}h${minutes % 60 ? String(minutes % 60).padStart(2, '0') : ''}`;
+	}
+
+	// Workload balance in real time this week, judged against capacity
 	const balance = $derived.by(() => {
 		const [a, b] = data.allUsers;
 		if (!a || !b) return null;
-		const pa = data.thisWeek.byUser[a.id] ?? 0;
-		const pb = data.thisWeek.byUser[b.id] ?? 0;
-		const total = pa + pb;
+		const ma = data.minutesByUser[a.id] ?? 0;
+		const mb = data.minutesByUser[b.id] ?? 0;
+		const total = ma + mb;
 		if (total === 0) return null;
-		const pctA = Math.round((pa / total) * 100);
+		const pctA = Math.round((ma / total) * 100);
+		const fairA = Math.round(
+			(a.capacityPercent / (a.capacityPercent + b.capacityPercent)) * 100
+		);
+		const adjusted = a.capacityPercent !== 100 || b.capacityPercent !== 100;
 		let caption: string;
-		if (pctA >= 40 && pctA <= 60) caption = 'Beautifully balanced — you two are in sync 💞';
-		else {
-			const carrier = pctA > 60 ? a.displayName : b.displayName;
-			caption = `${carrier} is carrying this week — a thank-you goes a long way 💐`;
+		if (Math.abs(pctA - fairA) <= 10) {
+			caption = adjusted
+				? "Balanced for this week's capacity — teamwork 💞"
+				: 'Beautifully balanced — you two are in sync 💞';
+		} else {
+			const carrier = pctA > fairA ? a.displayName : b.displayName;
+			caption = `${carrier} is carrying more than their share — a thank-you goes a long way 💐`;
 		}
-		return { a, b, pctA, caption };
+		return { a, b, ma, mb, pctA, fairA, adjusted, caption };
 	});
+
+	const RATING_FACES = ['😖', '🙁', '😐', '🙂', '🥰'];
 </script>
 
 <svelte:head><title>Stats · Home</title></svelte:head>
@@ -122,15 +137,136 @@
 
 	{#if balance}
 		<div class="mt-4">
+			<div class="mb-1 text-xs text-stone-500">
+				Effort this week
+				{#if balance.adjusted}
+					<span class="text-stone-400">· fair split at current capacity: {balance.fairA}/{100 - balance.fairA}</span>
+				{/if}
+			</div>
 			<div class="flex h-2.5 overflow-hidden rounded-full bg-stone-100">
 				<div class="{userColor[balance.a.id]} h-full" style="width: {balance.pctA}%"></div>
 				<div class="{userColor[balance.b.id]} h-full" style="width: {100 - balance.pctA}%"></div>
 			</div>
 			<div class="mt-1 flex justify-between text-xs text-stone-500">
-				<span>{balance.a.emoji} {balance.pctA}%</span>
-				<span>{100 - balance.pctA}% {balance.b.emoji}</span>
+				<span>{balance.a.emoji} {hours(balance.ma)}</span>
+				<span>{hours(balance.mb)} {balance.b.emoji}</span>
 			</div>
 			<p class="mt-1.5 text-center text-xs text-stone-600">{balance.caption}</p>
+		</div>
+	{/if}
+</section>
+
+<!-- Rebalance suggestion -->
+{#if data.rebalance}
+	<section class="mb-5 rounded-2xl bg-amber-50 p-4">
+		<h2 class="mb-1 text-sm font-semibold text-amber-900">⚖️ Rebalance idea</h2>
+		<p class="text-sm text-amber-900">
+			The effort balance has leaned {data.rebalance.fromName}'s way for a few weeks. Handing
+			<strong>{data.rebalance.houseEmoji} {data.rebalance.areaName}</strong> to
+			{data.rebalance.toName} would help even it out.
+		</p>
+		<form method="post" action="?/swapOwner" use:enhance class="mt-3">
+			<input type="hidden" name="areaId" value={data.rebalance.areaId} />
+			<input
+				type="hidden"
+				name="toUserId"
+				value={data.allUsers.find((u) => u.displayName === data.rebalance?.toName)?.id}
+			/>
+			<button class="w-full rounded-xl bg-amber-500 py-2.5 text-sm font-semibold text-white">
+				Swap it over
+			</button>
+		</form>
+	</section>
+{/if}
+
+<!-- Yuck + mental load -->
+<section class="mb-5 grid grid-cols-2 gap-3">
+	<div class="rounded-2xl bg-white p-4 shadow-sm">
+		<h2 class="mb-2 text-sm font-semibold text-stone-500">😖 Yuck share</h2>
+		{#each data.allUsers as u (u.id)}
+			<div class="flex justify-between text-sm">
+				<span>{u.emoji} {u.displayName}</span>
+				<span class="font-semibold">{data.dreadByUser[u.id] ?? 0}×</span>
+			</div>
+		{/each}
+		<p class="mt-1.5 text-xs text-stone-500">dreaded chores absorbed (12 weeks)</p>
+	</div>
+	<div class="rounded-2xl bg-white p-4 shadow-sm">
+		<h2 class="mb-2 text-sm font-semibold text-stone-500">🧠 Mental load</h2>
+		{#each data.allUsers as u (u.id)}
+			{@const load = data.mentalLoad[u.id]}
+			<div class="flex justify-between text-sm">
+				<span>{u.emoji} {u.displayName}</span>
+				<span class="font-semibold">
+					{load?.points ?? 0} <span class="font-normal text-stone-500">pts</span>
+				</span>
+			</div>
+		{/each}
+		<p class="mt-1.5 text-xs text-stone-500">for noticing & planning work</p>
+	</div>
+</section>
+
+<!-- Monthly fairness check-in -->
+<section class="mb-5 rounded-2xl bg-white p-4 shadow-sm">
+	<h2 class="mb-2 text-sm font-semibold text-stone-500">💬 Monthly check-in</h2>
+	{#if data.checkin.bothDone}
+		<p class="mb-2 text-sm text-stone-600">How fair did {data.checkin.month} feel?</p>
+		<div class="flex justify-around">
+			{#each data.checkin.entries as entry (entry.userId)}
+				{@const who = data.allUsers.find((u) => u.id === entry.userId)}
+				<div class="text-center">
+					<div class="text-2xl">{who?.emoji}</div>
+					<div class="text-2xl">{RATING_FACES[entry.rating - 1]}</div>
+					{#if entry.note}
+						<p class="mt-1 max-w-36 text-xs text-stone-500">“{entry.note}”</p>
+					{/if}
+				</div>
+			{/each}
+		</div>
+	{:else if data.checkin.mine}
+		<p class="text-sm text-stone-600">
+			You answered {RATING_FACES[data.checkin.mine.rating - 1]} — revealed once
+			your partner checks in too 🙈
+		</p>
+	{:else}
+		<p class="mb-2 text-sm text-stone-600">
+			How fair did the workload feel this month? Answers reveal together.
+		</p>
+		<form method="post" action="?/checkin" use:enhance class="flex flex-col gap-2">
+			<input type="hidden" name="month" value={data.checkin.month} />
+			<div class="flex justify-between">
+				{#each RATING_FACES as face, i (face)}
+					<button
+						name="rating"
+						value={i + 1}
+						aria-label="Rate {i + 1} out of 5"
+						class="rounded-xl border-2 border-stone-200 px-3 py-2 text-2xl hover:border-accent-500"
+					>
+						{face}
+					</button>
+				{/each}
+			</div>
+			<input
+				type="text"
+				name="note"
+				placeholder="Optional note…"
+				class="rounded-xl border-2 border-stone-200 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none"
+			/>
+		</form>
+	{/if}
+	{#if data.checkin.past.length > 0}
+		<div class="mt-3 border-t border-stone-100 pt-2">
+			{#each data.checkin.past as month (month[0].month)}
+				<div class="flex items-center justify-between py-0.5 text-sm">
+					<span class="text-stone-500">{month[0].month}</span>
+					<span>
+						{#each month as entry (entry.userId)}
+							{@const who = data.allUsers.find((u) => u.id === entry.userId)}
+							<span class="ml-2">{who?.emoji}{RATING_FACES[entry.rating - 1]}</span>
+						{/each}
+					</span>
+				</div>
+			{/each}
 		</div>
 	{/if}
 </section>

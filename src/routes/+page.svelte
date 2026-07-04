@@ -98,8 +98,21 @@
 	const overdueMine = $derived(mine.filter((t) => t.nextDueDate! < data.today).length);
 	const bestStreak = $derived(Math.max(0, ...mine.map((t) => data.streaks[t.id] ?? 0)));
 
+	function subtitleFor(task: (typeof data.tasks)[number]) {
+		if (!task.isTurn || task.nextTurnUserId === null) return task.areaName;
+		const turnUser = data.allUsers.find((u) => u.id === task.nextTurnUserId);
+		const who = turnUser?.id === me.id ? 'your' : `${turnUser?.displayName}'s`;
+		return `${task.areaName} · 🔁 ${who} turn`;
+	}
+
 	const encouragement = $derived.by(() => {
 		const name = partner?.displayName ?? 'your partner';
+		if (partner && partner.capacityPercent < 100 && (mine.length > 0 || shared.length > 0)) {
+			return `${name} is at ${partner.capacityPercent}% this week — you've got the conn 💪`;
+		}
+		if (me.capacityPercent < 100) {
+			return `Low-capacity week for you — small wins count double 💙`;
+		}
 		if (mine.length === 0 && shared.length === 0) {
 			return myDoneToday > 0
 				? `Everything on your side is done — ${myDoneToday} chore${myDoneToday === 1 ? '' : 's'} today. Enjoy! 🎉`
@@ -156,7 +169,7 @@
 			</summary>
 			<div class="flex flex-col gap-2 p-3 pt-0">
 				{#each tasks as task (task.id)}
-					<TaskItem {task} today={data.today} streak={data.streaks[task.id] ?? 0} subtitle={task.areaName} />
+					<TaskItem {task} today={data.today} streak={data.streaks[task.id] ?? 0} subtitle={subtitleFor(task)} />
 				{/each}
 			</div>
 		</details>
@@ -318,7 +331,7 @@
 					<h3 class="mb-1.5 text-sm font-semibold text-stone-500">{group.label}</h3>
 					<div class="flex flex-col gap-2">
 						{#each group.tasks as task (task.id)}
-							<TaskItem {task} today={data.today} streak={data.streaks[task.id] ?? 0} subtitle={task.areaName} />
+							<TaskItem {task} today={data.today} streak={data.streaks[task.id] ?? 0} subtitle={subtitleFor(task)} />
 						{/each}
 					</div>
 				</div>
