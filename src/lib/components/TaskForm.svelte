@@ -86,7 +86,7 @@
 
 	<div class="flex items-center justify-between gap-3">
 		<label class="flex items-center gap-2 text-sm font-medium">
-			<input type="checkbox" name="isRecurring" bind:checked={isRecurring} class="size-4 accent-emerald-600" />
+			<input type="checkbox" name="isRecurring" bind:checked={isRecurring} class="size-4 accent-emerald-700" />
 			Repeats
 		</label>
 		{#if isRecurring}
@@ -127,10 +127,10 @@
 			type="checkbox"
 			name="remindWhenAway"
 			checked={task?.remindWhenAway ?? false}
-			class="size-4 accent-emerald-600"
+			class="size-4 accent-emerald-700"
 		/>
 		Remind even when nobody's home
-		<span class="text-xs text-stone-400">(plants, bills…)</span>
+		<span class="text-xs text-stone-500">(plants, bills…)</span>
 	</label>
 
 	<button class="rounded-xl bg-accent-600 py-2.5 font-semibold text-white">{submitLabel}</button>

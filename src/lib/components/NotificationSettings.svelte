@@ -97,7 +97,7 @@
 	</h2>
 
 	{#if status === 'loading'}
-		<p class="text-sm text-stone-400">Checking…</p>
+		<p class="text-sm text-stone-500">Checking…</p>
 	{:else if status === 'not-installed'}
 		<p class="text-sm text-stone-600">
 			To get reminders on your iPhone, first add this app to your home screen:

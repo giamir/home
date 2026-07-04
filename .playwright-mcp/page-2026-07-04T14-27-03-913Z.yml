@@ -1,0 +1,164 @@
+- generic [ref=f10e3]:
+  - main [ref=f10e4]:
+    - generic [ref=f10e5]:
+      - heading "Good afternoon, Giamir 🧑‍🚀" [level=1] [ref=f10e6]
+      - generic [ref=f10e7]:
+        - button "🇮🇹 Gisela" [ref=f10e8]
+        - button "🇩🇪 Helga" [ref=f10e9]
+    - paragraph [ref=f10e10]:
+      - img [ref=f10e11]
+      - text: Fresh slate — the first chore sets the tone for the day ✨
+    - generic [ref=f10e14]:
+      - generic [ref=f10e15]:
+        - heading "This week" [level=2] [ref=f10e16]
+        - generic [ref=f10e17]: "Team total: 0"
+      - generic [ref=f10e18]:
+        - generic [ref=f10e19]:
+          - generic [ref=f10e20]: 🧑‍🚀
+          - generic [ref=f10e21]: Giamir
+          - generic [ref=f10e22]: "0"
+        - generic [ref=f10e23]:
+          - generic [ref=f10e24]: 🦊
+          - generic [ref=f10e25]: Nina
+          - generic [ref=f10e26]: "0"
+    - generic [ref=f10e27]:
+      - heading "🤝 Up for grabs" [level=2] [ref=f10e28]
+      - generic [ref=f10e29]:
+        - generic [ref=f10e30]:
+          - button "Mark Weekly grocery shop as done" [ref=f10e32]:
+            - img [ref=f10e33]
+          - generic [ref=f10e35]:
+            - generic [ref=f10e36]:
+              - text: Weekly grocery shop
+              - img [ref=f10e37]
+            - generic [ref=f10e42]: Groceries
+          - generic [ref=f10e43]:
+            - generic [ref=f10e44]: Today
+            - generic [ref=f10e45]: "+10"
+        - generic [ref=f10e46]:
+          - button "Mark Plan meals for the week as done" [ref=f10e48]:
+            - img [ref=f10e49]
+          - generic [ref=f10e51]:
+            - generic [ref=f10e52]:
+              - text: Plan meals for the week
+              - img [ref=f10e53]
+            - generic [ref=f10e58]: Meal Planning
+          - generic [ref=f10e59]:
+            - generic [ref=f10e60]: Today
+            - generic [ref=f10e61]: "+10"
+        - generic [ref=f10e62]:
+          - button "Mark Deep-clean kitchen as done" [ref=f10e64]:
+            - img [ref=f10e65]
+          - generic [ref=f10e67]:
+            - generic [ref=f10e68]:
+              - text: Deep-clean kitchen
+              - img [ref=f10e69]
+            - generic [ref=f10e74]: Kitchen
+          - generic [ref=f10e75]:
+            - generic [ref=f10e76]: Today
+            - generic [ref=f10e77]: "+20"
+        - generic [ref=f10e78]:
+          - button "Mark Vacuum & mop floors as done" [ref=f10e80]:
+            - img [ref=f10e81]
+          - generic [ref=f10e83]:
+            - generic [ref=f10e84]:
+              - text: Vacuum & mop floors
+              - img [ref=f10e85]
+            - generic [ref=f10e90]: Cleaning
+          - generic [ref=f10e91]:
+            - generic [ref=f10e92]: Today
+            - generic [ref=f10e93]: "+20"
+        - generic [ref=f10e94]:
+          - button "Mark Wash & fold laundry as done" [ref=f10e96]:
+            - img [ref=f10e97]
+          - generic [ref=f10e99]:
+            - generic [ref=f10e100]:
+              - text: Wash & fold laundry
+              - img [ref=f10e101]
+            - generic [ref=f10e106]: Laundry
+          - generic [ref=f10e107]:
+            - generic [ref=f10e108]: Today
+            - generic [ref=f10e109]: "+10"
+        - generic [ref=f10e110]:
+          - button "Mark Change bed sheets as done" [ref=f10e112]:
+            - img [ref=f10e113]
+          - generic [ref=f10e115]:
+            - generic [ref=f10e116]:
+              - text: Change bed sheets
+              - img [ref=f10e117]
+            - generic [ref=f10e122]: Bedroom & Bedding
+          - generic [ref=f10e123]:
+            - generic [ref=f10e124]: Today
+            - generic [ref=f10e125]: "+10"
+        - generic [ref=f10e126]:
+          - button "Mark Water the plants as done" [ref=f10e128]:
+            - img [ref=f10e129]
+          - generic [ref=f10e131]:
+            - generic [ref=f10e132]:
+              - text: Water the plants
+              - img [ref=f10e133]
+            - generic [ref=f10e138]: Plants
+          - generic [ref=f10e139]:
+            - generic [ref=f10e140]: Today
+            - generic [ref=f10e141]: "+5"
+        - generic [ref=f10e142]:
+          - button "Mark Take out trash & recycling as done" [ref=f10e144]:
+            - img [ref=f10e145]
+          - generic [ref=f10e147]:
+            - generic [ref=f10e148]:
+              - text: Take out trash & recycling
+              - img [ref=f10e149]
+            - generic [ref=f10e154]: Trash & Recycling
+          - generic [ref=f10e155]:
+            - generic [ref=f10e156]: Today
+            - generic [ref=f10e157]: "+5"
+        - generic [ref=f10e158]:
+          - button "Mark Check bills & payments as done" [ref=f10e160]:
+            - img [ref=f10e161]
+          - generic [ref=f10e163]:
+            - generic [ref=f10e164]:
+              - text: Check bills & payments
+              - img [ref=f10e165]
+            - generic [ref=f10e170]: Household Administration
+          - generic [ref=f10e171]:
+            - generic [ref=f10e172]: Today
+            - generic [ref=f10e173]: "+10"
+    - generic [ref=f10e174]:
+      - heading "🦊 On Nina's plate cover one to earn a shout-out" [level=2] [ref=f10e175]:
+        - text: 🦊 On Nina's plate
+        - generic [ref=f10e176]:
+          - img [ref=f10e177]
+          - text: cover one to earn a shout-out
+      - generic [ref=f10e183]:
+        - button "Mark Clean bathroom as done" [ref=f10e185]:
+          - img [ref=f10e186]
+        - generic [ref=f10e188]:
+          - generic [ref=f10e189]:
+            - text: Clean bathroom
+            - img [ref=f10e190]
+          - generic [ref=f10e195]: Bathrooms
+        - generic [ref=f10e196]:
+          - generic [ref=f10e197]: Today
+          - generic [ref=f10e198]: "+20"
+    - link "Peek at 🇮🇹 Gisela" [ref=f10e199] [cursor=pointer]:
+      - /url: /?house=1
+      - img [ref=f10e200]
+      - text: Peek at 🇮🇹 Gisela
+  - navigation [ref=f10e203]:
+    - generic [ref=f10e204]:
+      - link "Today" [ref=f10e205] [cursor=pointer]:
+        - /url: /
+        - img [ref=f10e206]
+        - text: Today
+      - link "Areas" [ref=f10e209] [cursor=pointer]:
+        - /url: /areas
+        - img [ref=f10e210]
+        - text: Areas
+      - link "Stats" [ref=f10e215] [cursor=pointer]:
+        - /url: /stats
+        - img [ref=f10e216]
+        - text: Stats
+      - link "Settings" [ref=f10e218] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=f10e219]
+        - text: Settings

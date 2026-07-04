@@ -49,7 +49,7 @@
 					<button
 						aria-label="Edit {task.title}"
 						onclick={() => (editingTaskId = editingTaskId === task.id ? null : task.id)}
-						class="ml-1 text-stone-300"
+						class="ml-1 text-stone-500"
 					>
 						<Pencil size={16} />
 					</button>
@@ -72,7 +72,7 @@
 				</div>
 			{/if}
 		{:else}
-			<p class="rounded-2xl bg-white p-4 text-center text-sm text-stone-400">No tasks yet.</p>
+			<p class="rounded-2xl bg-white p-4 text-center text-sm text-stone-500">No tasks yet.</p>
 		{/each}
 	</div>
 
@@ -84,7 +84,7 @@
 				submitLabel="Add task"
 				onsaved={() => (addingTask = false)}
 			/>
-			<button onclick={() => (addingTask = false)} class="mt-2 w-full py-1 text-sm text-stone-400">
+			<button onclick={() => (addingTask = false)} class="mt-2 w-full py-1 text-sm text-stone-500">
 				Cancel
 			</button>
 		</div>
@@ -92,7 +92,7 @@
 		<button
 			onclick={() => (addingTask = true)}
 			class="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed
-				border-stone-300 p-3 text-sm font-medium text-stone-500"
+				border-stone-400 p-3 text-sm font-medium text-stone-500"
 		>
 			<Plus size={16} /> New task
 		</button>
@@ -117,13 +117,13 @@
 					value={resp.text}
 					class="min-w-0 flex-1 bg-transparent py-1 text-sm focus:outline-none"
 				/>
-				<button aria-label="Save" class="text-stone-300 hover:text-accent-600">
+				<button aria-label="Save" class="text-stone-500 hover:text-accent-600">
 					<Check size={15} />
 				</button>
 				<button
 					aria-label="Delete"
 					formaction="?/deleteResponsibility"
-					class="text-stone-300 hover:text-red-500"
+					class="text-stone-500 hover:text-red-600"
 				>
 					<X size={15} />
 				</button>
@@ -156,16 +156,16 @@
 					<span class="min-w-0 flex-1 truncate">
 						{completion.taskTitle}
 						{#if completion.coveredForUserId}
-							<HandHeart size={13} class="inline text-pink-500" />
+							<HandHeart size={13} class="inline text-pink-600" />
 						{/if}
 					</span>
-					<span class="text-xs text-stone-400">
+					<span class="text-xs text-stone-500">
 						{completionDate(completion.completedAt)} · +{completion.pointsAwarded}
 					</span>
 					{#if completion.userId === data.user?.id}
 						<form method="post" action="?/uncomplete" use:enhance>
 							<input type="hidden" name="completionId" value={completion.id} />
-							<button aria-label="Undo" class="text-stone-300 hover:text-stone-500">
+							<button aria-label="Undo" class="text-stone-500 hover:text-stone-700">
 								<Undo2 size={15} />
 							</button>
 						</form>

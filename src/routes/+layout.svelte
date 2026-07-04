@@ -36,7 +36,7 @@
 					<a
 						href={tab.href}
 						class="flex flex-1 flex-col items-center gap-0.5 py-2 text-xs font-medium
-							{isActive(tab.href) ? 'text-accent-600' : 'text-stone-400'}"
+							{isActive(tab.href) ? 'text-accent-600' : 'text-stone-500'}"
 					>
 						<tab.icon size={22} strokeWidth={isActive(tab.href) ? 2.5 : 2} />
 						{tab.label}

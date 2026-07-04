@@ -15,7 +15,7 @@
 		<span class="text-3xl">{data.user?.emoji}</span>
 		<div>
 			<div class="font-semibold">{data.user?.displayName}</div>
-			<div class="text-xs text-stone-400">@{data.user?.username}</div>
+			<div class="text-xs text-stone-500">@{data.user?.username}</div>
 		</div>
 	</div>
 </div>
@@ -31,7 +31,7 @@
 			<summary class="cursor-pointer list-none p-4 text-sm font-medium">
 				{household.emoji}
 				{household.name}
-				<span class="ml-1 text-xs font-normal text-stone-400">{household.timezone}</span>
+				<span class="ml-1 text-xs font-normal text-stone-500">{household.timezone}</span>
 			</summary>
 			<form
 				method="post"
@@ -90,7 +90,7 @@
 	<summary
 		class="flex cursor-pointer list-none items-center gap-2 p-4 text-sm font-medium"
 	>
-		<KeyRound size={15} class="text-stone-400" /> Change password
+		<KeyRound size={15} class="text-stone-500" /> Change password
 	</summary>
 	<form method="post" action="?/changePassword" use:enhance class="flex flex-col gap-3 p-4 pt-0">
 		<input

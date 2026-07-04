@@ -30,6 +30,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const rows = await db
 		.select({
 			completion: completions,
+			taskTitle: tasks.title,
 			areaName: areas.name,
 			householdId: areas.householdId
 		})
@@ -41,9 +42,25 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const enriched = rows.map((r) => ({
 		...r.completion,
 		localDate: completionLocalDate(r.completion.completedAt, timezone),
+		taskTitle: r.taskTitle,
 		areaName: r.areaName,
 		householdId: r.householdId
 	}));
+
+	const activity = [...enriched]
+		.sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime())
+		.slice(0, 20)
+		.map((c) => ({
+			id: c.id,
+			userId: c.userId,
+			taskTitle: c.taskTitle,
+			areaName: c.areaName,
+			houseEmoji: allHouseholds.find((h) => h.id === c.householdId)?.emoji ?? '',
+			pointsAwarded: c.pointsAwarded,
+			covered: c.coveredForUserId !== null,
+			localDate: c.localDate,
+			completedAt: c.completedAt
+		}));
 
 	// Per-user on-time rate
 	const onTimeByUser: Record<number, number | null> = {};
@@ -110,6 +127,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	return {
 		allUsers,
+		activity,
+		today,
 		thisWeek: weeklyScore(enriched, today),
 		history: weeklyHistory(enriched).slice(0, 8),
 		covering: coveringCounts(enriched),

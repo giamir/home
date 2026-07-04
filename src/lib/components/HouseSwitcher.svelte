@@ -16,7 +16,7 @@
 			name="householdId"
 			value={household.id}
 			class="rounded-full px-3 py-1 text-sm font-medium transition-colors
-				{household.id === currentHouseholdId ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}"
+				{household.id === currentHouseholdId ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600'}"
 		>
 			{household.emoji}
 			{household.name}

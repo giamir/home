@@ -76,6 +76,30 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		if (c.localDate === today) doneToday[c.userId] = (doneToday[c.userId] ?? 0) + 1;
 	}
 
+	// Today's completion log for the viewed house
+	const doneTodayList = (
+		await db
+			.select({
+				id: completions.id,
+				taskTitle: tasks.title,
+				areaId: areas.id,
+				userId: completions.userId,
+				pointsAwarded: completions.pointsAwarded,
+				coveredForUserId: completions.coveredForUserId,
+				completedAt: completions.completedAt
+			})
+			.from(completions)
+			.innerJoin(tasks, eq(completions.taskId, tasks.id))
+			.innerJoin(areas, eq(tasks.areaId, areas.id))
+			.where(
+				and(
+					eq(areas.householdId, household.id),
+					gte(completions.completedAt, new Date(Date.now() - 2 * 86_400_000))
+				)
+			)
+			.orderBy(desc(completions.completedAt))
+	).filter((c) => completionLocalDate(c.completedAt, household.timezone) === today);
+
 	return {
 		household,
 		viewingOther: household.id !== currentId,
@@ -84,6 +108,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		streaks,
 		score,
 		doneToday,
+		doneTodayList,
 		allUsers,
 		tasks: withResponsible
 	};

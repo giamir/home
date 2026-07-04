@@ -56,14 +56,14 @@
 							{data.dueCounts[area.id]}
 						</span>
 					{/if}
-					<ChevronRight size={18} class="text-stone-300" />
+					<ChevronRight size={18} class="text-stone-500" />
 				</a>
 			{/each}
 		</div>
 	</section>
 {/each}
 
-<details class="mb-4 rounded-2xl border border-dashed border-stone-300">
+<details class="mb-4 rounded-2xl border border-dashed border-stone-400">
 	<summary
 		class="flex cursor-pointer list-none items-center justify-center gap-2 p-3 text-sm
 			font-medium text-stone-500"

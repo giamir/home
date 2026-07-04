@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Crown, Eye, HandHeart, PartyPopper, Sparkles } from '@lucide/svelte';
+	import { enhance } from '$app/forms';
+	import { Crown, Eye, HandHeart, PartyPopper, Sparkles, Undo2 } from '@lucide/svelte';
 	import HouseSwitcher from '$lib/components/HouseSwitcher.svelte';
 	import TaskItem from '$lib/components/TaskItem.svelte';
 	import { daysBetween } from '$lib/dates';
@@ -92,7 +93,7 @@
 <section class="mb-6 rounded-2xl bg-white p-4 shadow-sm">
 	<div class="mb-2 flex items-baseline justify-between">
 		<h2 class="text-sm font-semibold text-stone-500">This week</h2>
-		<span class="text-xs text-stone-400">Team total: {data.score.team}</span>
+		<span class="text-xs text-stone-500">Team total: {data.score.team}</span>
 	</div>
 	<div class="flex justify-around">
 		{#each data.allUsers as u (u.id)}
@@ -145,7 +146,7 @@
 	<section class="mb-6">
 		<h2 class="mb-2 flex items-center gap-1.5 text-sm font-semibold text-stone-500">
 			{partner.emoji} On {partner.displayName}'s plate
-			<span class="flex items-center gap-0.5 text-xs font-normal text-pink-500">
+			<span class="flex items-center gap-0.5 text-xs font-normal text-pink-600">
 				<HandHeart size={12} /> cover one to earn a shout-out
 			</span>
 		</h2>
@@ -179,11 +180,45 @@
 	</section>
 {/if}
 
+{#if data.doneTodayList.length > 0}
+	<section class="mb-6">
+		<h2 class="mb-2 text-sm font-semibold text-stone-500">Done today 🎉</h2>
+		<div class="flex flex-col gap-1.5">
+			{#each data.doneTodayList as completion (completion.id)}
+				{@const doer = data.allUsers.find((u) => u.id === completion.userId)}
+				<div class="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm shadow-sm">
+					<span>{doer?.emoji}</span>
+					<span class="min-w-0 flex-1 truncate text-stone-500 line-through">
+						{completion.taskTitle}
+					</span>
+					{#if completion.coveredForUserId}
+						<HandHeart size={14} class="shrink-0 text-pink-600" />
+					{/if}
+					<span class="shrink-0 text-xs text-stone-500">
+						{new Date(completion.completedAt).toLocaleTimeString('en-GB', {
+							hour: '2-digit',
+							minute: '2-digit'
+						})} · +{completion.pointsAwarded}
+					</span>
+					{#if completion.userId === me.id}
+						<form method="post" action="?/uncomplete" use:enhance>
+							<input type="hidden" name="completionId" value={completion.id} />
+							<button aria-label="Undo {completion.taskTitle}" class="text-stone-500 hover:text-stone-700">
+								<Undo2 size={15} />
+							</button>
+						</form>
+					{/if}
+				</div>
+			{/each}
+		</div>
+	</section>
+{/if}
+
 {#if otherHouse && !data.viewingOther}
 	<a
 		href="/?house={otherHouse.id}"
 		class="mb-4 flex items-center justify-center gap-2 rounded-2xl border border-dashed
-			border-stone-300 p-3 text-sm text-stone-500"
+			border-stone-400 p-3 text-sm text-stone-500"
 	>
 		<Eye size={16} />
 		Peek at {otherHouse.emoji} {otherHouse.name}

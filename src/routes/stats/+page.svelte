@@ -9,12 +9,18 @@
 	const userColor: Record<number, string> = {};
 	$effect.pre(() => {
 		data.allUsers.forEach((u, i) => {
-			userColor[u.id] = i === 0 ? 'bg-accent-500' : 'bg-sky-500';
+			userColor[u.id] = i === 0 ? 'bg-accent-500' : 'bg-sky-600';
 		});
 	});
 
 	function weekLabel(weekStart: string) {
 		const [, m, d] = weekStart.split('-');
+		return `${d}/${m}`;
+	}
+
+	function dayLabel(localDate: string) {
+		if (localDate === data.today) return 'Today';
+		const [y, m, d] = localDate.split('-');
 		return `${d}/${m}`;
 	}
 
@@ -48,7 +54,7 @@
 			</div>
 		{/each}
 	</div>
-	<div class="mt-2 text-center text-xs text-stone-400">Team total: {data.thisWeek.team}</div>
+	<div class="mt-2 text-center text-xs text-stone-500">Team total: {data.thisWeek.team}</div>
 </section>
 
 <!-- Weekly history -->
@@ -58,7 +64,7 @@
 		<div class="flex flex-col gap-2">
 			{#each data.history as week (week.weekStart)}
 				<div class="flex items-center gap-2">
-					<span class="w-11 shrink-0 text-xs text-stone-400">{weekLabel(week.weekStart)}</span>
+					<span class="w-11 shrink-0 text-xs text-stone-500">{weekLabel(week.weekStart)}</span>
 					<div class="flex h-4 flex-1 gap-px overflow-hidden rounded-full bg-stone-100">
 						{#each data.allUsers as u (u.id)}
 							<div
@@ -86,7 +92,7 @@
 <section class="mb-5 grid grid-cols-2 gap-3">
 	<div class="rounded-2xl bg-white p-4 shadow-sm">
 		<h2 class="mb-2 flex items-center gap-1 text-sm font-semibold text-stone-500">
-			<HandHeart size={15} class="text-pink-500" /> Covered
+			<HandHeart size={15} class="text-pink-600" /> Covered
 		</h2>
 		{#each data.allUsers as u (u.id)}
 			<div class="flex justify-between text-sm">
@@ -94,7 +100,7 @@
 				<span class="font-semibold">{data.covering[u.id] ?? 0}×</span>
 			</div>
 		{/each}
-		<p class="mt-1.5 text-xs text-stone-400">times covering for each other (12 weeks)</p>
+		<p class="mt-1.5 text-xs text-stone-500">times covering for each other (12 weeks)</p>
 	</div>
 	<div class="rounded-2xl bg-white p-4 shadow-sm">
 		<h2 class="mb-2 text-sm font-semibold text-stone-500">⏱ On time</h2>
@@ -106,7 +112,7 @@
 				</span>
 			</div>
 		{/each}
-		<p class="mt-1.5 text-xs text-stone-400">of chores done by their due date</p>
+		<p class="mt-1.5 text-xs text-stone-500">of chores done by their due date</p>
 	</div>
 </section>
 
@@ -118,8 +124,33 @@
 			{#each data.streaks as streak (streak.house + streak.title)}
 				<div class="flex items-center justify-between text-sm">
 					<span>{streak.house} {streak.title}</span>
-					<span class="flex items-center gap-0.5 font-semibold text-orange-500">
+					<span class="flex items-center gap-0.5 font-semibold text-orange-700">
 						<Flame size={14} />{streak.streak}
+					</span>
+				</div>
+			{/each}
+		</div>
+	</section>
+{/if}
+
+<!-- Recent activity -->
+{#if data.activity.length > 0}
+	<section class="mb-5 rounded-2xl bg-white p-4 shadow-sm">
+		<h2 class="mb-2 text-sm font-semibold text-stone-500">Recent activity</h2>
+		<div class="flex flex-col gap-1.5">
+			{#each data.activity as entry (entry.id)}
+				{@const doer = data.allUsers.find((u) => u.id === entry.userId)}
+				<div class="flex items-center gap-2 text-sm">
+					<span class="w-11 shrink-0 text-xs text-stone-500">{dayLabel(entry.localDate)}</span>
+					<span class="shrink-0">{doer?.emoji}</span>
+					<span class="min-w-0 flex-1 truncate">
+						{entry.taskTitle}
+						{#if entry.covered}
+							<HandHeart size={13} class="inline text-pink-600" />
+						{/if}
+					</span>
+					<span class="shrink-0 text-xs text-stone-500">
+						{entry.houseEmoji} +{entry.pointsAwarded}
 					</span>
 				</div>
 			{/each}
