@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { ChevronRight, Plus } from '@lucide/svelte';
+	import { Archive, ArchiveRestore, ChevronRight, Plus } from '@lucide/svelte';
 	import HouseSwitcher from '$lib/components/HouseSwitcher.svelte';
 	import IconPicker from '$lib/components/IconPicker.svelte';
 	import OwnerSelect from '$lib/components/OwnerSelect.svelte';
@@ -88,3 +88,29 @@
 		<button class="rounded-xl bg-accent-600 py-2.5 font-semibold text-white">Create area</button>
 	</form>
 </details>
+
+{#if data.archivedAreas.length > 0}
+	<details class="mb-4 rounded-2xl bg-white shadow-sm">
+		<summary
+			class="flex cursor-pointer list-none items-center gap-2 p-3 text-sm font-medium text-stone-500"
+		>
+			<Archive size={15} /> Archived areas ({data.archivedAreas.length})
+		</summary>
+		<div class="flex flex-col gap-1.5 p-3 pt-0">
+			{#each data.archivedAreas as area (area.id)}
+				<form
+					method="post"
+					action="?/restoreArea"
+					use:enhance
+					class="flex items-center gap-2 rounded-xl bg-stone-50 px-3 py-2 text-sm"
+				>
+					<input type="hidden" name="areaId" value={area.id} />
+					<span class="min-w-0 flex-1 truncate text-stone-600">{area.name}</span>
+					<button class="flex shrink-0 items-center gap-1 text-xs font-medium text-accent-700">
+						<ArchiveRestore size={14} /> Restore
+					</button>
+				</form>
+			{/each}
+		</div>
+	</details>
+{/if}

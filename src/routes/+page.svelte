@@ -200,14 +200,12 @@
 							minute: '2-digit'
 						})} · +{completion.pointsAwarded}
 					</span>
-					{#if completion.userId === me.id}
-						<form method="post" action="?/uncomplete" use:enhance>
-							<input type="hidden" name="completionId" value={completion.id} />
-							<button aria-label="Undo {completion.taskTitle}" class="text-stone-500 hover:text-stone-700">
-								<Undo2 size={15} />
-							</button>
-						</form>
-					{/if}
+					<form method="post" action="?/uncomplete" use:enhance>
+						<input type="hidden" name="completionId" value={completion.id} />
+						<button aria-label="Undo {completion.taskTitle}" class="text-stone-500 hover:text-stone-700">
+							<Undo2 size={15} />
+						</button>
+					</form>
 				</div>
 			{/each}
 		</div>

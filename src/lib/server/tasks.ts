@@ -64,13 +64,17 @@ export async function completeTask(taskId: number, doer: Doer) {
 	}
 }
 
-/** Undo a completion (your own only) and restore the task's due date. */
-export async function uncompleteTask(completionId: number, userId: number) {
+/**
+ * Undo a completion and restore the task's due date. Either partner can undo
+ * either's completion — it's a two-person household, and mistakes happen on
+ * whichever phone is closest.
+ */
+export async function uncompleteTask(completionId: number) {
 	const [completion] = await db
 		.select()
 		.from(completions)
 		.where(eq(completions.id, completionId));
-	if (!completion || completion.userId !== userId) return;
+	if (!completion) return;
 
 	await db.delete(completions).where(eq(completions.id, completionId));
 	await db

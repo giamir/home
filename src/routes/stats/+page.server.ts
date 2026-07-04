@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { areas, completions, households, tasks, users } from '$lib/server/db/schema';
@@ -10,9 +10,31 @@ import {
 	weeklyScore
 } from '$lib/server/gamification';
 import { completionLocalDate } from '$lib/server/tasks';
-import { localToday } from '$lib/dates';
+import { localHour, localToday } from '$lib/dates';
 
 const HISTORY_DAYS = 12 * 7;
+const POINTS_PER_LEVEL = 200;
+const LEVEL_TITLES = [
+	'Fresh Nesters',
+	'Tidy Rookies',
+	'Broom Buddies',
+	'Dust Busters',
+	'Suds Squad',
+	'Sparkle Duo',
+	'Order Wizards',
+	'Chore Champions',
+	'Household Heroes',
+	'Domestic Legends'
+];
+
+/** The single user strictly ahead in `counts`, or null on a tie / all-zero. */
+function topUser(counts: Record<number, number>): number | null {
+	const entries = Object.entries(counts).filter(([, n]) => n > 0);
+	if (entries.length === 0) return null;
+	entries.sort((a, b) => b[1] - a[1]);
+	if (entries.length > 1 && entries[0][1] === entries[1][1]) return null;
+	return Number(entries[0][0]);
+}
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const user = locals.user!;
@@ -47,20 +69,80 @@ export const load: PageServerLoad = async ({ locals }) => {
 		householdId: r.householdId
 	}));
 
-	const activity = [...enriched]
-		.sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime())
-		.slice(0, 20)
-		.map((c) => ({
-			id: c.id,
-			userId: c.userId,
-			taskTitle: c.taskTitle,
-			areaName: c.areaName,
-			houseEmoji: allHouseholds.find((h) => h.id === c.householdId)?.emoji ?? '',
-			pointsAwarded: c.pointsAwarded,
-			covered: c.coveredForUserId !== null,
-			localDate: c.localDate,
-			completedAt: c.completedAt
-		}));
+	const thisWeek = weeklyScore(enriched, today);
+	const history = weeklyHistory(enriched);
+
+	// Team level: all-time points, shared — it only ever grows
+	const [allTime] = await db
+		.select({
+			count: sql<number>`count(*)::int`,
+			points: sql<number>`coalesce(sum(points_awarded), 0)::int`
+		})
+		.from(completions);
+	const level = Math.floor(allTime.points / POINTS_PER_LEVEL) + 1;
+	const teamLevel = {
+		level,
+		title: LEVEL_TITLES[Math.min(level - 1, LEVEL_TITLES.length - 1)],
+		progress: allTime.points % POINTS_PER_LEVEL,
+		perLevel: POINTS_PER_LEVEL,
+		totalPoints: allTime.points,
+		totalChores: allTime.count
+	};
+
+	// Weekly team goal: beat your own 4-week average (self-tuning, no config)
+	const pastWeeks = history.filter((w) => w.weekStart !== thisWeek.weekStart).slice(0, 4);
+	const weeklyGoal =
+		pastWeeks.length > 0
+			? Math.max(
+					50,
+					Math.round(pastWeeks.reduce((sum, w) => sum + w.team, 0) / pastWeeks.length / 10) * 10
+				)
+			: 100;
+
+	// This week's superlatives
+	const weekCompletions = enriched.filter((c) => c.localDate >= thisWeek.weekStart);
+	const counters = {
+		morning: {} as Record<number, number>,
+		evening: {} as Record<number, number>,
+		covers: {} as Record<number, number>
+	};
+	for (const c of weekCompletions) {
+		const hour = localHour(timezone, c.completedAt);
+		if (hour < 12) counters.morning[c.userId] = (counters.morning[c.userId] ?? 0) + 1;
+		if (hour >= 18) counters.evening[c.userId] = (counters.evening[c.userId] ?? 0) + 1;
+		if (c.coveredForUserId !== null && c.coveredForUserId !== c.userId) {
+			counters.covers[c.userId] = (counters.covers[c.userId] ?? 0) + 1;
+		}
+	}
+	// Hottest area of the week, and its champion
+	const areaPoints: Record<string, number> = {};
+	for (const c of weekCompletions) {
+		areaPoints[c.areaName] = (areaPoints[c.areaName] ?? 0) + c.pointsAwarded;
+	}
+	const hottestArea = Object.entries(areaPoints).sort((a, b) => b[1] - a[1])[0]?.[0];
+	const areaChampCounts: Record<number, number> = {};
+	if (hottestArea) {
+		for (const c of weekCompletions) {
+			if (c.areaName === hottestArea) {
+				areaChampCounts[c.userId] = (areaChampCounts[c.userId] ?? 0) + c.pointsAwarded;
+			}
+		}
+	}
+
+	const highlights: { emoji: string; title: string; userId: number }[] = [];
+	const earlyBird = topUser(counters.morning);
+	if (earlyBird !== null) highlights.push({ emoji: '🌅', title: 'Early bird', userId: earlyBird });
+	const nightOwl = topUser(counters.evening);
+	if (nightOwl !== null) highlights.push({ emoji: '🦉', title: 'Night owl', userId: nightOwl });
+	const teammate = topUser(counters.covers);
+	if (teammate !== null)
+		highlights.push({ emoji: '💚', title: 'Best teammate', userId: teammate });
+	const champion = topUser(areaChampCounts);
+	if (champion !== null && hottestArea)
+		highlights.push({ emoji: '🏆', title: `${hottestArea} hero`, userId: champion });
+
+	// Winner per past week, for the crown on the history rows
+	const historyWithWinners = history.slice(0, 8).map((w) => ({ ...w, winnerId: topUser(w.byUser) }));
 
 	// Per-user on-time rate
 	const onTimeByUser: Record<number, number | null> = {};
@@ -97,7 +179,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.where(and(eq(tasks.isRecurring, true), isNull(tasks.archivedAt), isNull(areas.archivedAt)));
 	const streaks: { title: string; house: string; streak: number }[] = [];
 	if (recurringTasks.length > 0) {
-		const history = await db
+		const streakHistory = await db
 			.select({ taskId: completions.taskId, onTime: completions.onTime })
 			.from(completions)
 			.where(
@@ -109,7 +191,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			.orderBy(desc(completions.completedAt))
 			.limit(500);
 		for (const task of recurringTasks) {
-			const flags = history.filter((h) => h.taskId === task.id).map((h) => h.onTime);
+			const flags = streakHistory.filter((h) => h.taskId === task.id).map((h) => h.onTime);
 			const houseTz =
 				allHouseholds.find((h) => h.id === task.householdId)?.timezone ?? timezone;
 			const overdue = task.nextDueDate !== null && task.nextDueDate < localToday(houseTz);
@@ -125,12 +207,30 @@ export const load: PageServerLoad = async ({ locals }) => {
 		streaks.sort((a, b) => b.streak - a.streak);
 	}
 
+	const activity = [...enriched]
+		.sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime())
+		.slice(0, 20)
+		.map((c) => ({
+			id: c.id,
+			userId: c.userId,
+			taskTitle: c.taskTitle,
+			areaName: c.areaName,
+			houseEmoji: allHouseholds.find((h) => h.id === c.householdId)?.emoji ?? '',
+			pointsAwarded: c.pointsAwarded,
+			covered: c.coveredForUserId !== null,
+			localDate: c.localDate,
+			completedAt: c.completedAt
+		}));
+
 	return {
 		allUsers,
 		activity,
 		today,
-		thisWeek: weeklyScore(enriched, today),
-		history: weeklyHistory(enriched).slice(0, 8),
+		thisWeek,
+		teamLevel,
+		weeklyGoal,
+		highlights,
+		history: historyWithWinners,
 		covering: coveringCounts(enriched),
 		onTimeByUser,
 		byHouse,

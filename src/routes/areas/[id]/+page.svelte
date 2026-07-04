@@ -1,6 +1,17 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { ArrowLeft, Check, HandHeart, Pencil, Plus, Trash2, Undo2, X } from '@lucide/svelte';
+	import {
+		Archive,
+		ArchiveRestore,
+		ArrowLeft,
+		Check,
+		HandHeart,
+		Pencil,
+		Plus,
+		Trash2,
+		Undo2,
+		X
+	} from '@lucide/svelte';
 	import AreaSettings from '$lib/components/AreaSettings.svelte';
 	import TaskForm from '$lib/components/TaskForm.svelte';
 	import TaskItem from '$lib/components/TaskItem.svelte';
@@ -162,18 +173,45 @@
 					<span class="text-xs text-stone-500">
 						{completionDate(completion.completedAt)} · +{completion.pointsAwarded}
 					</span>
-					{#if completion.userId === data.user?.id}
-						<form method="post" action="?/uncomplete" use:enhance>
-							<input type="hidden" name="completionId" value={completion.id} />
-							<button aria-label="Undo" class="text-stone-500 hover:text-stone-700">
-								<Undo2 size={15} />
-							</button>
-						</form>
-					{/if}
+					<form method="post" action="?/uncomplete" use:enhance>
+						<input type="hidden" name="completionId" value={completion.id} />
+						<button aria-label="Undo" class="text-stone-500 hover:text-stone-700">
+							<Undo2 size={15} />
+						</button>
+					</form>
 				</div>
 			{/each}
 		</div>
 	</section>
+{/if}
+
+<!-- Archived tasks (removed by hand or completed one-offs) -->
+{#if data.archivedTasks.length > 0}
+	<details class="mb-4 rounded-2xl bg-white shadow-sm">
+		<summary
+			class="flex cursor-pointer list-none items-center gap-2 p-3 text-sm font-medium text-stone-500"
+		>
+			<Archive size={15} /> Archived tasks ({data.archivedTasks.length})
+		</summary>
+		<div class="flex flex-col gap-1.5 p-3 pt-0">
+			{#each data.archivedTasks as task (task.id)}
+				<form
+					method="post"
+					action="?/restoreTask"
+					use:enhance
+					class="flex items-center gap-2 rounded-xl bg-stone-50 px-3 py-2 text-sm"
+				>
+					<input type="hidden" name="taskId" value={task.id} />
+					<span class="min-w-0 flex-1 truncate text-stone-600">{task.title}</span>
+					<button
+						class="flex shrink-0 items-center gap-1 text-xs font-medium text-accent-700"
+					>
+						<ArchiveRestore size={14} /> Restore
+					</button>
+				</form>
+			{/each}
+		</div>
+	</details>
 {/if}
 
 <!-- Area settings -->

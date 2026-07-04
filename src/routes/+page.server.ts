@@ -126,7 +126,7 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const completionId = Number(form.get('completionId'));
 		if (!Number.isInteger(completionId)) return fail(400);
-		await uncompleteTask(completionId, locals.user!.id);
+		await uncompleteTask(completionId);
 		return {};
 	}
 };

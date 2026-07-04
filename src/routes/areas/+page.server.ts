@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
@@ -32,9 +32,17 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		}
 	}
 
+	const archivedAreas = await db
+		.select({ id: areas.id, name: areas.name, icon: areas.icon })
+		.from(areas)
+		.where(and(eq(areas.householdId, household.id), isNotNull(areas.archivedAt)))
+		.orderBy(desc(areas.archivedAt))
+		.limit(20);
+
 	return {
 		household,
 		areas: areaRows,
+		archivedAreas,
 		dueCounts,
 		allUsers: await db
 			.select({ id: users.id, displayName: users.displayName, emoji: users.emoji })
@@ -63,5 +71,13 @@ export const actions: Actions = {
 			})
 			.returning();
 		redirect(303, `/areas/${area.id}`);
+	},
+
+	restoreArea: async ({ request }) => {
+		const form = await request.formData();
+		const areaId = Number(form.get('areaId'));
+		if (!Number.isInteger(areaId)) return fail(400);
+		await db.update(areas).set({ archivedAt: null }).where(eq(areas.id, areaId));
+		return {};
 	}
 };

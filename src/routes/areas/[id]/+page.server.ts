@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, ne } from 'drizzle-orm';
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
@@ -66,6 +66,13 @@ export const load: PageServerLoad = async ({ params }) => {
 			db.select().from(households).where(ne(households.id, row.area.householdId))
 		]);
 
+	const archivedTasks = await db
+		.select({ id: tasks.id, title: tasks.title, archivedAt: tasks.archivedAt })
+		.from(tasks)
+		.where(and(eq(tasks.areaId, id), isNotNull(tasks.archivedAt)))
+		.orderBy(desc(tasks.archivedAt))
+		.limit(30);
+
 	const recurringIds = openTasks.filter((t) => t.isRecurring).map((t) => t.id);
 	const streaks: Record<number, number> = {};
 	if (recurringIds.length > 0) {
@@ -89,6 +96,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		otherHousehold: otherHouseholds[0] ?? null,
 		responsibilities,
 		tasks: openTasks,
+		archivedTasks,
 		recentCompletions,
 		streaks,
 		allUsers,
@@ -223,6 +231,14 @@ export const actions: Actions = {
 		return {};
 	},
 
+	restoreTask: async ({ request }) => {
+		const form = await request.formData();
+		const taskId = Number(form.get('taskId'));
+		if (!Number.isInteger(taskId)) return fail(400);
+		await db.update(tasks).set({ archivedAt: null }).where(eq(tasks.id, taskId));
+		return {};
+	},
+
 	complete: async ({ request, locals }) => {
 		const form = await request.formData();
 		const taskId = Number(form.get('taskId'));
@@ -235,7 +251,7 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const completionId = Number(form.get('completionId'));
 		if (!Number.isInteger(completionId)) return fail(400);
-		await uncompleteTask(completionId, locals.user!.id);
+		await uncompleteTask(completionId);
 		return {};
 	}
 };
