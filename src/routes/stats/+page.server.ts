@@ -6,6 +6,7 @@ import {
 	computeStreak,
 	coveringCounts,
 	onTimeRate,
+	teamLevel as computeTeamLevel,
 	weeklyHistory,
 	weeklyScore
 } from '$lib/server/gamification';
@@ -13,19 +14,6 @@ import { completionLocalDate } from '$lib/server/tasks';
 import { localHour, localToday } from '$lib/dates';
 
 const HISTORY_DAYS = 12 * 7;
-const POINTS_PER_LEVEL = 200;
-const LEVEL_TITLES = [
-	'Fresh Nesters',
-	'Tidy Rookies',
-	'Broom Buddies',
-	'Dust Busters',
-	'Suds Squad',
-	'Sparkle Duo',
-	'Order Wizards',
-	'Chore Champions',
-	'Household Heroes',
-	'Domestic Legends'
-];
 
 /** The single user strictly ahead in `counts`, or null on a tie / all-zero. */
 function topUser(counts: Record<number, number>): number | null {
@@ -79,12 +67,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			points: sql<number>`coalesce(sum(points_awarded), 0)::int`
 		})
 		.from(completions);
-	const level = Math.floor(allTime.points / POINTS_PER_LEVEL) + 1;
 	const teamLevel = {
-		level,
-		title: LEVEL_TITLES[Math.min(level - 1, LEVEL_TITLES.length - 1)],
-		progress: allTime.points % POINTS_PER_LEVEL,
-		perLevel: POINTS_PER_LEVEL,
+		...computeTeamLevel(allTime.points),
 		totalPoints: allTime.points,
 		totalChores: allTime.count
 	};

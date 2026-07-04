@@ -11,6 +11,7 @@ import {
 	users
 } from '$lib/server/db/schema';
 import { completeTask, uncompleteTask } from '$lib/server/tasks';
+import { getReactions, toggleReaction } from '$lib/server/reactions';
 import { computeStreak } from '$lib/server/gamification';
 import { localToday } from '$lib/dates';
 
@@ -66,6 +67,8 @@ export const load: PageServerLoad = async ({ params }) => {
 			db.select().from(households).where(ne(households.id, row.area.householdId))
 		]);
 
+	const reactions = await getReactions(recentCompletions.map((c) => c.id));
+
 	const archivedTasks = await db
 		.select({ id: tasks.id, title: tasks.title, archivedAt: tasks.archivedAt })
 		.from(tasks)
@@ -98,6 +101,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		tasks: openTasks,
 		archivedTasks,
 		recentCompletions,
+		reactions,
 		streaks,
 		allUsers,
 		today
@@ -244,6 +248,15 @@ export const actions: Actions = {
 		const taskId = Number(form.get('taskId'));
 		if (!Number.isInteger(taskId)) return fail(400);
 		await completeTask(taskId, locals.user!);
+		return {};
+	},
+
+	react: async ({ request, locals }) => {
+		const form = await request.formData();
+		const completionId = Number(form.get('completionId'));
+		const emoji = String(form.get('emoji') ?? '');
+		if (!Number.isInteger(completionId) || !emoji) return fail(400);
+		await toggleReaction(completionId, locals.user!, emoji);
 		return {};
 	},
 

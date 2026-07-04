@@ -6,6 +6,7 @@ import { db } from '$lib/server/db';
 import { areas, households, tasks, users } from '$lib/server/db/schema';
 import { resolveReminderTargets } from '$lib/server/reminders';
 import { sendPushToUser } from '$lib/server/push';
+import { reminderBody } from '$lib/server/push-copy';
 import { daysBetween, localHour, localToday } from '$lib/dates';
 
 /**
@@ -64,13 +65,7 @@ export const GET: RequestHandler = async ({ request }) => {
 			if (targets.length === 0) continue;
 
 			const overdueDays = -daysBetween(today, task.nextDueDate!);
-			const isRepeat = task.lastRemindedAt !== null;
-			const body =
-				overdueDays > 0
-					? `${area.name} · ${overdueDays} day${overdueDays === 1 ? '' : 's'} overdue`
-					: isRepeat
-						? `${area.name} · still open today`
-						: `${area.name} · due today`;
+			const body = reminderBody(area.name, overdueDays, task.lastRemindedAt !== null);
 
 			for (const userId of targets) {
 				await sendPushToUser(userId, {

@@ -1,5 +1,29 @@
 import { weekStart } from '../dates';
 
+export const POINTS_PER_LEVEL = 200;
+export const LEVEL_TITLES = [
+	'Fresh Nesters',
+	'Tidy Rookies',
+	'Broom Buddies',
+	'Dust Busters',
+	'Suds Squad',
+	'Sparkle Duo',
+	'Order Wizards',
+	'Chore Champions',
+	'Household Heroes',
+	'Domestic Legends'
+];
+
+export function teamLevel(totalPoints: number) {
+	const level = Math.floor(totalPoints / POINTS_PER_LEVEL) + 1;
+	return {
+		level,
+		title: LEVEL_TITLES[Math.min(level - 1, LEVEL_TITLES.length - 1)],
+		progress: totalPoints % POINTS_PER_LEVEL,
+		perLevel: POINTS_PER_LEVEL
+	};
+}
+
 export interface CompletionLike {
 	userId: number;
 	pointsAwarded: number;

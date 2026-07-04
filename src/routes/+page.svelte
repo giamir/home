@@ -1,19 +1,27 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
 	import {
+		AlarmClockOff,
 		Check,
 		ChevronRight,
+		ClipboardCheck,
 		Eye,
 		HandHeart,
+		Handshake,
 		PartyPopper,
+		Plus,
+		Trophy,
 		Undo2
 	} from '@lucide/svelte';
 	import HouseSwitcher from '$lib/components/HouseSwitcher.svelte';
 	import TaskItem from '$lib/components/TaskItem.svelte';
+	import ReactionBar from '$lib/components/ReactionBar.svelte';
+	import Confetti from '$lib/components/Confetti.svelte';
 	import { daysBetween } from '$lib/dates';
 
-	let { data } = $props();
+	let { data, form } = $props();
 
 	const me = $derived(data.user!);
 	const partner = $derived(data.allUsers.find((u) => u.id !== me.id));
@@ -33,10 +41,35 @@
 		data.tasks.filter((t) => {
 			if (t.nextDueDate === null) return false;
 			const d = daysBetween(data.today, t.nextDueDate);
-			return d >= 1 && d <= 7;
+			return d >= 1 && d <= 14;
 		})
 	);
 	const anytime = $derived(data.tasks.filter((t) => t.nextDueDate === null));
+
+	// Agenda: coming up, grouped by day
+	const upcomingGroups = $derived.by(() => {
+		const groups: { date: string; label: string; tasks: typeof upcoming }[] = [];
+		for (const task of upcoming) {
+			let group = groups.find((g) => g.date === task.nextDueDate);
+			if (!group) {
+				const diff = daysBetween(data.today, task.nextDueDate!);
+				const [y, m, d] = task.nextDueDate!.split('-').map(Number);
+				const label =
+					diff === 1
+						? 'Tomorrow'
+						: new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', {
+								weekday: 'long',
+								day: 'numeric',
+								month: 'short',
+								timeZone: 'UTC'
+							});
+				group = { date: task.nextDueDate!, label, tasks: [] };
+				groups.push(group);
+			}
+			group.tasks.push(task);
+		}
+		return groups.sort((a, b) => (a.date < b.date ? -1 : 1));
+	});
 
 	// The one thing to suggest first: your overdue > yours today > shared > cover
 	const hero = $derived.by(() => {
@@ -55,8 +88,9 @@
 		return diff < 0 ? `${-diff} day${diff === -1 ? '' : 's'} overdue` : 'due today';
 	});
 
-	// Remaining lists, with the hero task taken out
 	const minusHero = (list: typeof mine) => list.filter((t) => t.id !== hero?.task.id);
+
+	const overdueCount = $derived(dueNow.filter((t) => t.nextDueDate! < data.today).length);
 
 	const myPoints = $derived(data.score.byUser[me.id] ?? 0);
 	const partnerPoints = $derived(partner ? (data.score.byUser[partner.id] ?? 0) : 0);
@@ -80,7 +114,28 @@
 		return 'One small chore sets the tone for the day ✨';
 	});
 
-	let heroCompleting = $state(false);
+	let heroBusy = $state(false);
+	let confettiBurst = $state(0);
+	let levelUp = $state<{ level: number; title: string } | null>(null);
+
+	$effect(() => {
+		if (form?.completed) {
+			untrack(() => {
+				confettiBurst++;
+				if (form.leveledUp && form.newLevel && form.newLevelTitle) {
+					levelUp = { level: form.newLevel, title: form.newLevelTitle };
+				}
+			});
+		}
+	});
+
+	const heroEnhance = () => {
+		heroBusy = true;
+		return async ({ update }: { update: () => Promise<void> }) => {
+			await update();
+			heroBusy = false;
+		};
+	};
 </script>
 
 {#snippet taskSection(title: string, tasks: typeof mine, open: boolean, hint: Snippet | null)}
@@ -110,6 +165,28 @@
 
 <svelte:head><title>Today · Home</title></svelte:head>
 
+{#if confettiBurst > 0}
+	{#key confettiBurst}
+		<Confetti />
+	{/key}
+{/if}
+
+{#if levelUp}
+	<div class="fixed inset-0 z-40 flex items-center justify-center bg-stone-900/50 p-6">
+		<div class="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-xl">
+			<Trophy size={40} class="mx-auto text-amber-500" />
+			<h2 class="mt-3 text-2xl font-bold">Level {levelUp.level}!</h2>
+			<p class="mt-1 text-lg">You two are now <strong>{levelUp.title}</strong> 🎉</p>
+			<button
+				onclick={() => (levelUp = null)}
+				class="mt-4 w-full rounded-xl bg-accent-600 py-3 font-semibold text-white"
+			>
+				Keep it going
+			</button>
+		</div>
+	</div>
+{/if}
+
 <header class="mb-2 flex items-center justify-between gap-2">
 	<h1 class="text-xl font-bold">{greeting}, {me.displayName} {me.emoji}</h1>
 	<HouseSwitcher households={data.households} currentHouseholdId={me.currentHouseholdId ?? null} />
@@ -129,7 +206,7 @@
 {#if hero}
 	<section
 		class="mb-4 rounded-2xl border-2 border-accent-200 bg-white p-4 shadow-sm
-			{heroCompleting ? 'opacity-40' : ''}"
+			{heroBusy ? 'opacity-40' : ''}"
 	>
 		<div class="text-xs font-semibold tracking-wide text-accent-700 uppercase">
 			{hero.kicker}
@@ -141,21 +218,10 @@
 				· 🔥 {data.streaks[hero.task.id]}-streak
 			{/if}
 		</p>
-		<form
-			method="post"
-			action="?/complete"
-			class="mt-3"
-			use:enhance={() => {
-				heroCompleting = true;
-				return async ({ update }) => {
-					await update();
-					heroCompleting = false;
-				};
-			}}
-		>
+		<form method="post" action="?/complete" class="mt-3" use:enhance={heroEnhance}>
 			<input type="hidden" name="taskId" value={hero.task.id} />
 			<button
-				disabled={heroCompleting}
+				disabled={heroBusy}
 				class="flex w-full items-center justify-center gap-2 rounded-xl bg-accent-600 py-3
 					text-base font-semibold text-white disabled:opacity-50"
 			>
@@ -163,6 +229,28 @@
 				Mark done · +{hero.task.points}
 			</button>
 		</form>
+		<div class="mt-2 flex gap-2">
+			<form method="post" action="?/completeTogether" class="flex-1" use:enhance={heroEnhance}>
+				<input type="hidden" name="taskId" value={hero.task.id} />
+				<button
+					disabled={heroBusy}
+					class="flex w-full items-center justify-center gap-1.5 rounded-xl border-2
+						border-stone-200 py-2 text-sm font-medium text-stone-600 disabled:opacity-50"
+				>
+					<Handshake size={15} /> We did it together
+				</button>
+			</form>
+			<form method="post" action="?/snooze" class="flex-1" use:enhance={heroEnhance}>
+				<input type="hidden" name="taskId" value={hero.task.id} />
+				<button
+					disabled={heroBusy}
+					class="flex w-full items-center justify-center gap-1.5 rounded-xl border-2
+						border-stone-200 py-2 text-sm font-medium text-stone-600 disabled:opacity-50"
+				>
+					<AlarmClockOff size={15} /> Not today
+				</button>
+			</form>
+		</div>
 	</section>
 {:else}
 	<section class="mb-4 flex items-center gap-3 rounded-2xl bg-accent-50 p-4 text-accent-700">
@@ -172,6 +260,17 @@
 			<div class="text-sm">Nothing needs you right now.</div>
 		</div>
 	</section>
+{/if}
+
+{#if overdueCount >= 2}
+	<a
+		href="/review"
+		class="mb-4 flex items-center gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900"
+	>
+		<ClipboardCheck size={16} class="shrink-0" />
+		<span class="flex-1">{overdueCount} chores slipped — review them in a minute</span>
+		<ChevronRight size={16} />
+	</a>
 {/if}
 
 <!-- Compact week strip -->
@@ -195,12 +294,84 @@
 {#if partner}
 	{@render taskSection(`${partner.emoji} On ${partner.displayName}'s plate`, minusHero(partners), false, heartHint)}
 {/if}
-{@render taskSection('Coming up', upcoming, false, null)}
-{@render taskSection('Anytime', anytime, false, null)}
 
 {#snippet heartHint()}
 	<HandHeart size={15} class="shrink-0 text-pink-600" />
 {/snippet}
+
+<!-- Agenda: coming up grouped by day -->
+{#if upcomingGroups.length > 0}
+	<details class="mb-3 rounded-2xl bg-white shadow-sm">
+		<summary class="flex cursor-pointer list-none items-center gap-2 p-4 font-medium select-none">
+			<span class="flex-1">Coming up</span>
+			<span
+				class="flex size-6 shrink-0 items-center justify-center rounded-full bg-stone-100
+					text-xs font-semibold text-stone-600"
+			>
+				{upcoming.length}
+			</span>
+			<ChevronRight size={16} class="shrink-0 text-stone-500" />
+		</summary>
+		<div class="flex flex-col gap-3 p-3 pt-0">
+			{#each upcomingGroups as group (group.date)}
+				<div>
+					<h3 class="mb-1.5 text-sm font-semibold text-stone-500">{group.label}</h3>
+					<div class="flex flex-col gap-2">
+						{#each group.tasks as task (task.id)}
+							<TaskItem {task} today={data.today} streak={data.streaks[task.id] ?? 0} subtitle={task.areaName} />
+						{/each}
+					</div>
+				</div>
+			{/each}
+		</div>
+	</details>
+{/if}
+
+{@render taskSection('Anytime', anytime, false, null)}
+
+<!-- Quick add an ad-hoc task -->
+<details class="mb-3 rounded-2xl border border-dashed border-stone-400">
+	<summary
+		class="flex cursor-pointer list-none items-center justify-center gap-2 p-3 text-sm
+			font-medium text-stone-500 select-none"
+	>
+		<Plus size={16} /> Add a quick task
+	</summary>
+	<form method="post" action="?/quickAdd" use:enhance class="flex flex-col gap-3 p-3 pt-0">
+		<input
+			type="text"
+			name="title"
+			placeholder="What needs doing?"
+			required
+			class="rounded-xl border-2 border-stone-200 bg-white px-3 py-2
+				focus:border-accent-500 focus:outline-none"
+		/>
+		<div class="flex gap-2">
+			<select
+				name="areaId"
+				class="min-w-0 flex-1 rounded-xl border-2 border-stone-200 bg-white px-2 py-2 text-sm"
+			>
+				{#each data.houseAreas as area (area.id)}
+					<option value={area.id}>{area.name}</option>
+				{/each}
+			</select>
+			<select name="points" class="rounded-xl border-2 border-stone-200 bg-white px-2 py-2 text-sm">
+				<option value="5">+5</option>
+				<option value="10" selected>+10</option>
+				<option value="20">+20</option>
+				<option value="40">+40</option>
+			</select>
+		</div>
+		<label class="flex items-center gap-2 text-sm">
+			<input type="checkbox" name="dueToday" checked class="size-4 accent-emerald-700" />
+			Due today (unchecked = anytime)
+		</label>
+		{#if form?.quickAddMessage}
+			<p class="text-sm text-red-600">{form.quickAddMessage}</p>
+		{/if}
+		<button class="rounded-xl bg-accent-600 py-2.5 font-semibold text-white">Add task</button>
+	</form>
+</details>
 
 <!-- Done today -->
 {#if data.doneTodayList.length > 0}
@@ -234,13 +405,19 @@
 							})} · +{completion.pointsAwarded}
 						</div>
 					</div>
+					<ReactionBar
+						completionId={completion.id}
+						reactions={data.reactions}
+						users={data.allUsers}
+						meId={me.id}
+					/>
 					<form method="post" action="?/uncomplete" use:enhance>
 						<input type="hidden" name="completionId" value={completion.id} />
 						<button
 							aria-label="Undo {completion.taskTitle}"
-							class="flex items-center gap-1 text-sm text-stone-500 hover:text-stone-700"
+							class="text-stone-500 hover:text-stone-700"
 						>
-							<Undo2 size={16} /> Undo
+							<Undo2 size={16} />
 						</button>
 					</form>
 				</div>

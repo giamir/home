@@ -13,6 +13,7 @@
 		X
 	} from '@lucide/svelte';
 	import AreaSettings from '$lib/components/AreaSettings.svelte';
+	import ReactionBar from '$lib/components/ReactionBar.svelte';
 	import TaskForm from '$lib/components/TaskForm.svelte';
 	import TaskItem from '$lib/components/TaskItem.svelte';
 	import { areaIcon } from '$lib/icons';
@@ -74,12 +75,20 @@
 						{task}
 						onsaved={() => (editingTaskId = null)}
 					/>
-					<form method="post" action="?/archiveTask" use:enhance class="mt-2">
-						<input type="hidden" name="taskId" value={task.id} />
-						<button class="flex w-full items-center justify-center gap-1 rounded-xl py-2 text-sm text-red-600">
-							<Trash2 size={14} /> Remove task
-						</button>
-					</form>
+					<div class="mt-2 flex items-center">
+						<a
+							href="/tasks/{task.id}"
+							class="flex flex-1 items-center justify-center gap-1 py-2 text-sm font-medium text-stone-600"
+						>
+							📜 History
+						</a>
+						<form method="post" action="?/archiveTask" use:enhance class="flex-1">
+							<input type="hidden" name="taskId" value={task.id} />
+							<button class="flex w-full items-center justify-center gap-1 py-2 text-sm text-red-600">
+								<Trash2 size={14} /> Remove task
+							</button>
+						</form>
+					</div>
 				</div>
 			{/if}
 		{:else}
@@ -173,6 +182,12 @@
 					<span class="text-xs text-stone-500">
 						{completionDate(completion.completedAt)} · +{completion.pointsAwarded}
 					</span>
+					<ReactionBar
+						completionId={completion.id}
+						reactions={data.reactions}
+						users={data.allUsers}
+						meId={data.user!.id}
+					/>
 					<form method="post" action="?/uncomplete" use:enhance>
 						<input type="hidden" name="completionId" value={completion.id} />
 						<button aria-label="Undo" class="text-stone-500 hover:text-stone-700">

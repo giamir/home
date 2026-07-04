@@ -8,7 +8,8 @@ import {
 	boolean,
 	timestamp,
 	date,
-	index
+	index,
+	uniqueIndex
 } from 'drizzle-orm/pg-core';
 
 export const households = pgTable('households', {
@@ -118,6 +119,22 @@ export const completions = pgTable(
 	]
 );
 
+export const completionReactions = pgTable(
+	'completion_reactions',
+	{
+		id: serial('id').primaryKey(),
+		completionId: integer('completion_id')
+			.notNull()
+			.references(() => completions.id, { onDelete: 'cascade' }),
+		userId: smallint('user_id')
+			.notNull()
+			.references(() => users.id),
+		emoji: text('emoji').notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow()
+	},
+	(t) => [uniqueIndex('completion_reactions_one_per_user').on(t.completionId, t.userId)]
+);
+
 export const pushSubscriptions = pgTable('push_subscriptions', {
 	id: serial('id').primaryKey(),
 	userId: smallint('user_id')
@@ -136,4 +153,5 @@ export type Area = typeof areas.$inferSelect;
 export type AreaResponsibility = typeof areaResponsibilities.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type Completion = typeof completions.$inferSelect;
+export type CompletionReaction = typeof completionReactions.$inferSelect;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;

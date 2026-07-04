@@ -3,9 +3,15 @@ import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { areas, completions, households, tasks, users } from '$lib/server/db/schema';
-import { completeTask, completionLocalDate, uncompleteTask } from '$lib/server/tasks';
+import {
+	completeTask,
+	completeTaskTogether,
+	completionLocalDate,
+	uncompleteTask
+} from '$lib/server/tasks';
+import { getReactions, toggleReaction } from '$lib/server/reactions';
 import { computeStreak, weeklyScore } from '$lib/server/gamification';
-import { localHour, localToday } from '$lib/dates';
+import { addToDate, localHour, localToday } from '$lib/dates';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!;
@@ -100,7 +106,18 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			.orderBy(desc(completions.completedAt))
 	).filter((c) => completionLocalDate(c.completedAt, household.timezone) === today);
 
+	const [reactions, houseAreas] = await Promise.all([
+		getReactions(doneTodayList.map((c) => c.id)),
+		db
+			.select({ id: areas.id, name: areas.name })
+			.from(areas)
+			.where(and(eq(areas.householdId, household.id), isNull(areas.archivedAt)))
+			.orderBy(areas.sortOrder, areas.id)
+	]);
+
 	return {
+		reactions,
+		houseAreas,
 		household,
 		viewingOther: household.id !== currentId,
 		today,
@@ -119,14 +136,66 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const taskId = Number(form.get('taskId'));
 		if (!Number.isInteger(taskId)) return fail(400);
-		await completeTask(taskId, locals.user!);
-		return { completed: taskId };
+		const result = await completeTask(taskId, locals.user!);
+		return { completed: taskId, ...result };
 	},
-	uncomplete: async ({ request, locals }) => {
+	completeTogether: async ({ request }) => {
+		const form = await request.formData();
+		const taskId = Number(form.get('taskId'));
+		if (!Number.isInteger(taskId)) return fail(400);
+		const result = await completeTaskTogether(taskId);
+		return { completed: taskId, ...result };
+	},
+	uncomplete: async ({ request }) => {
 		const form = await request.formData();
 		const completionId = Number(form.get('completionId'));
 		if (!Number.isInteger(completionId)) return fail(400);
 		await uncompleteTask(completionId);
 		return {};
+	},
+	snooze: async ({ request, locals }) => {
+		const form = await request.formData();
+		const taskId = Number(form.get('taskId'));
+		if (!Number.isInteger(taskId)) return fail(400);
+		const [row] = await db
+			.select({ task: tasks, timezone: households.timezone })
+			.from(tasks)
+			.innerJoin(areas, eq(tasks.areaId, areas.id))
+			.innerJoin(households, eq(areas.householdId, households.id))
+			.where(eq(tasks.id, taskId));
+		if (!row) return fail(404);
+		const tomorrow = addToDate(localToday(row.timezone), 1, 'day');
+		await db.update(tasks).set({ nextDueDate: tomorrow }).where(eq(tasks.id, taskId));
+		return { snoozed: taskId };
+	},
+	react: async ({ request, locals }) => {
+		const form = await request.formData();
+		const completionId = Number(form.get('completionId'));
+		const emoji = String(form.get('emoji') ?? '');
+		if (!Number.isInteger(completionId) || !emoji) return fail(400);
+		await toggleReaction(completionId, locals.user!, emoji);
+		return {};
+	},
+	quickAdd: async ({ request }) => {
+		const form = await request.formData();
+		const title = String(form.get('title') ?? '').trim();
+		const areaId = Number(form.get('areaId'));
+		const points = Number(form.get('points')) || 10;
+		const dueToday = form.get('dueToday') === 'on';
+		if (!title || !Number.isInteger(areaId)) return fail(400, { quickAddMessage: 'Title and area required' });
+		const [area] = await db
+			.select({ id: areas.id, timezone: households.timezone })
+			.from(areas)
+			.innerJoin(households, eq(areas.householdId, households.id))
+			.where(eq(areas.id, areaId));
+		if (!area) return fail(404);
+		await db.insert(tasks).values({
+			areaId,
+			title,
+			points,
+			isRecurring: false,
+			nextDueDate: dueToday ? localToday(area.timezone) : null
+		});
+		return { quickAdded: true };
 	}
 };
