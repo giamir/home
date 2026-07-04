@@ -5,7 +5,7 @@ import { db } from '$lib/server/db';
 import { areas, completions, households, tasks, users } from '$lib/server/db/schema';
 import { completeTask, completionLocalDate, uncompleteTask } from '$lib/server/tasks';
 import { computeStreak, weeklyScore } from '$lib/server/gamification';
-import { daysBetween, localToday } from '$lib/dates';
+import { localHour, localToday } from '$lib/dates';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = locals.user!;
@@ -22,6 +22,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			points: tasks.points,
 			nextDueDate: tasks.nextDueDate,
 			isRecurring: tasks.isRecurring,
+			assignedUserId: tasks.assignedUserId,
+			areaOwnerUserId: areas.ownerUserId,
 			areaId: areas.id,
 			areaName: areas.name
 		})
@@ -31,6 +33,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			and(eq(areas.householdId, household.id), isNull(tasks.archivedAt), isNull(areas.archivedAt))
 		)
 		.orderBy(tasks.nextDueDate);
+
+	const withResponsible = taskRows.map((t) => ({
+		...t,
+		responsibleId: t.assignedUserId ?? t.areaOwnerUserId
+	}));
 
 	// Streaks for the recurring tasks on screen
 	const recurringIds = taskRows.filter((t) => t.isRecurring).map((t) => t.id);
@@ -59,28 +66,26 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.select()
 		.from(completions)
 		.where(gte(completions.completedAt, new Date(Date.now() - 9 * 86_400_000)));
-	const score = weeklyScore(
-		recent.map((c) => ({ ...c, localDate: completionLocalDate(c.completedAt, household.timezone) })),
-		today
-	);
+	const recentLocal = recent.map((c) => ({
+		...c,
+		localDate: completionLocalDate(c.completedAt, household.timezone)
+	}));
+	const score = weeklyScore(recentLocal, today);
+	const doneToday: Record<number, number> = {};
+	for (const c of recentLocal) {
+		if (c.localDate === today) doneToday[c.userId] = (doneToday[c.userId] ?? 0) + 1;
+	}
 
-	const withDue = taskRows.filter((t) => t.nextDueDate !== null);
 	return {
 		household,
 		viewingOther: household.id !== currentId,
 		today,
+		hour: localHour(household.timezone),
 		streaks,
 		score,
+		doneToday,
 		allUsers,
-		sections: {
-			overdue: withDue.filter((t) => daysBetween(today, t.nextDueDate!) < 0),
-			today: withDue.filter((t) => t.nextDueDate === today),
-			upcoming: withDue.filter((t) => {
-				const d = daysBetween(today, t.nextDueDate!);
-				return d >= 1 && d <= 7;
-			}),
-			anytime: taskRows.filter((t) => t.nextDueDate === null)
-		}
+		tasks: withResponsible
 	};
 };
 

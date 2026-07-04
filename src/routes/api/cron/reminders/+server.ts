@@ -1,12 +1,22 @@
 import { error, json } from '@sveltejs/kit';
-import { and, eq, isNotNull, isNull, lte, or, ne } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, lt, lte, or } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
 import { areas, households, tasks, users } from '$lib/server/db/schema';
 import { resolveReminderTargets } from '$lib/server/reminders';
 import { sendPushToUser } from '$lib/server/push';
-import { daysBetween, localToday } from '$lib/dates';
+import { daysBetween, localHour, localToday } from '$lib/dates';
+
+/**
+ * A still-not-done task is re-nudged at most every REMIND_GAP_HOURS, and only
+ * during the household's waking window (reminderHour .. QUIET_FROM local
+ * time). With the two daily Vercel cron runs this means a morning and an
+ * evening nudge; pinging the endpoint more often (manually or via an external
+ * scheduler) escalates gracefully without night-time or rapid-fire spam.
+ */
+const REMIND_GAP_HOURS = 5;
+const QUIET_FROM = 21;
 
 export const GET: RequestHandler = async ({ request }) => {
 	if (!env.CRON_SECRET || request.headers.get('authorization') !== `Bearer ${env.CRON_SECRET}`) {
@@ -20,7 +30,11 @@ export const GET: RequestHandler = async ({ request }) => {
 
 	let sent = 0;
 	for (const household of allHouseholds) {
+		const hour = localHour(household.timezone);
+		if (hour < household.reminderHour || hour >= QUIET_FROM) continue;
+
 		const today = localToday(household.timezone);
+		const gapCutoff = new Date(Date.now() - REMIND_GAP_HOURS * 3_600_000);
 
 		const dueTasks = await db
 			.select({ task: tasks, area: areas })
@@ -33,7 +47,7 @@ export const GET: RequestHandler = async ({ request }) => {
 					isNull(areas.archivedAt),
 					isNotNull(tasks.nextDueDate),
 					lte(tasks.nextDueDate, today),
-					or(isNull(tasks.lastRemindedOn), ne(tasks.lastRemindedOn, today))
+					or(isNull(tasks.lastRemindedAt), lt(tasks.lastRemindedAt, gapCutoff))
 				)
 			);
 
@@ -50,10 +64,13 @@ export const GET: RequestHandler = async ({ request }) => {
 			if (targets.length === 0) continue;
 
 			const overdueDays = -daysBetween(today, task.nextDueDate!);
+			const isRepeat = task.lastRemindedAt !== null;
 			const body =
 				overdueDays > 0
 					? `${area.name} · ${overdueDays} day${overdueDays === 1 ? '' : 's'} overdue`
-					: `${area.name} · due today`;
+					: isRepeat
+						? `${area.name} · still open today`
+						: `${area.name} · due today`;
 
 			for (const userId of targets) {
 				await sendPushToUser(userId, {
@@ -63,7 +80,7 @@ export const GET: RequestHandler = async ({ request }) => {
 				});
 				sent++;
 			}
-			await db.update(tasks).set({ lastRemindedOn: today }).where(eq(tasks.id, task.id));
+			await db.update(tasks).set({ lastRemindedAt: new Date() }).where(eq(tasks.id, task.id));
 		}
 	}
 

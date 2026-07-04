@@ -85,7 +85,7 @@ export const tasks = pgTable(
 		// The single live due date ("this calendar day in the household's timezone").
 		nextDueDate: date('next_due_date'),
 		remindWhenAway: boolean('remind_when_away').notNull().default(false),
-		lastRemindedOn: date('last_reminded_on'),
+		lastRemindedAt: timestamp('last_reminded_at', { withTimezone: true, mode: 'date' }),
 		archivedAt: timestamp('archived_at', { withTimezone: true, mode: 'date' }),
 		createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow()
 	},
