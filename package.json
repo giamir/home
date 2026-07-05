@@ -18,7 +18,8 @@
 		"db:seed": "tsx --env-file=.env scripts/seed.ts",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
-		"db:studio": "drizzle-kit studio"
+		"db:studio": "drizzle-kit studio",
+		"db:backup": "bash scripts/backup.sh"
 	},
 	"devDependencies": {
 		"@neondatabase/serverless": "^1.1.0",

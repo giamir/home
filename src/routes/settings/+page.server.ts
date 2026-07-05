@@ -25,7 +25,8 @@ export const actions: Actions = {
 		const name = String(form.get('name') ?? '').trim();
 		const emoji = String(form.get('emoji') ?? '').trim() || '🏠';
 		const timezone = String(form.get('timezone') ?? 'Europe/Berlin');
-		const reminderHour = Math.min(23, Math.max(0, Number(form.get('reminderHour')) || 8));
+		// Cap below the cron's QUIET_FROM (21) — a later hour would never fire.
+		const reminderHour = Math.min(20, Math.max(0, Number(form.get('reminderHour')) || 8));
 		if (!name || !Number.isInteger(id)) return fail(400, { message: 'Name required' });
 		await db
 			.update(households)
@@ -38,10 +39,7 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const capacity = Number(form.get('capacity'));
 		if (![25, 50, 75, 100].includes(capacity)) return fail(400);
-		await db
-			.update(users)
-			.set({ capacityPercent: capacity })
-			.where(eq(users.id, locals.user!.id));
+		await db.update(users).set({ capacityPercent: capacity }).where(eq(users.id, locals.user!.id));
 		return { capacitySaved: true };
 	},
 

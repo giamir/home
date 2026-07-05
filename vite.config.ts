@@ -12,7 +12,9 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			adapter: adapter(),
+			// Pin functions next to the Neon DB (eu-central-1) — the neon-http
+			// driver pays a full HTTP round trip per query, so region matters.
+			adapter: adapter({ regions: ['fra1'] }),
 			typescript: {
 				config: (config) => ({
 					...config,

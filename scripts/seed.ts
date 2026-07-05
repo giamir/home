@@ -22,6 +22,23 @@ if (!giamirPassword || !ninaPassword) {
 	process.exit(1);
 }
 
+// --force is only allowed against known-safe (dev branch) Neon endpoints, so
+// the guard fails closed if the production endpoint is ever recreated/renamed.
+const FORCE_SAFE_ENDPOINTS = ['ep-silent-dust-asl7zyd6' /* home-db `dev` branch */];
+
+const dbHost = new URL(process.env.DATABASE_URL).hostname;
+const forceSafe = FORCE_SAFE_ENDPOINTS.some((ep) => dbHost.startsWith(ep));
+if (force && !forceSafe && process.env.SEED_ALLOW_PROD !== '1') {
+	console.error(
+		`Refusing --force: ${dbHost} is not a known dev-branch endpoint.\n` +
+			'Point DATABASE_URL at the dev branch (or add a new dev endpoint to\n' +
+			'FORCE_SAFE_ENDPOINTS in scripts/seed.ts). Set SEED_ALLOW_PROD=1 only\n' +
+			'if you truly mean to wipe this database.'
+	);
+	process.exit(1);
+}
+console.log(`Seeding ${dbHost}${force ? ' (wiping existing data)' : ''}`);
+
 const db = drizzle(neon(process.env.DATABASE_URL), { schema });
 
 const AGREEMENT: { name: string; icon: string; responsibilities: string[] }[] = [
@@ -243,9 +260,9 @@ async function main() {
 				.insert(areas)
 				.values({ householdId: household.id, name: spec.name, icon: spec.icon, sortOrder })
 				.returning();
-			await db.insert(areaResponsibilities).values(
-				spec.responsibilities.map((text, i) => ({ areaId: area.id, text, sortOrder: i }))
-			);
+			await db
+				.insert(areaResponsibilities)
+				.values(spec.responsibilities.map((text, i) => ({ areaId: area.id, text, sortOrder: i })));
 			for (const [areaName, title, points, interval, unit, remindWhenAway] of STARTER_TASKS) {
 				if (areaName !== spec.name) continue;
 				await db.insert(tasks).values({

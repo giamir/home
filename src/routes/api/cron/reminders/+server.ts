@@ -10,13 +10,18 @@ import { reminderBody } from '$lib/server/push-copy';
 import { daysBetween, localHour, localToday } from '$lib/dates';
 
 /**
- * A still-not-done task is re-nudged at most every REMIND_GAP_HOURS, and only
- * during the household's waking window (reminderHour .. QUIET_FROM local
- * time). With the two daily Vercel cron runs this means a morning and an
- * evening nudge; pinging the endpoint more often (manually or via an external
- * scheduler) escalates gracefully without night-time or rapid-fire spam.
+ * The Vercel cron pings this endpoint hourly. Each household only gets pushes
+ * during its waking window (reminderHour .. QUIET_FROM local time), and a
+ * still-not-done task is re-nudged at most every REMIND_GAP_HOURS — with the
+ * default 08:00 reminderHour that works out to a morning and an evening nudge
+ * (~08:00 and ~18:00 local) in any season or timezone. Fixed UTC schedules
+ * used to skip the morning nudge whenever DST shifted it before reminderHour.
  */
-const REMIND_GAP_HOURS = 5;
+const REMIND_GAP_HOURS = 10;
+// The gap is exactly two cron ticks, and lastRemindedAt is written after the
+// sends — without slack, cron jitter makes the second nudge race the boundary
+// and lose (for reminderHour 10 that would drop the evening nudge outright).
+const REMIND_GAP_SLACK_MINUTES = 30;
 const QUIET_FROM = 21;
 
 export const GET: RequestHandler = async ({ request }) => {
@@ -24,18 +29,24 @@ export const GET: RequestHandler = async ({ request }) => {
 		error(401);
 	}
 
-	const [allHouseholds, allUsers] = await Promise.all([
-		db.select().from(households),
-		db.select({ id: users.id, currentHouseholdId: users.currentHouseholdId }).from(users)
-	]);
+	const allHouseholds = await db.select().from(households);
+	const activeHouseholds = allHouseholds.filter((h) => {
+		const hour = localHour(h.timezone);
+		return hour >= h.reminderHour && hour < QUIET_FROM;
+	});
+	// Overnight the hourly cron has nothing to do — skip the users query too.
+	if (activeHouseholds.length === 0) return json({ sent: 0 });
+
+	const allUsers = await db
+		.select({ id: users.id, currentHouseholdId: users.currentHouseholdId })
+		.from(users);
 
 	let sent = 0;
-	for (const household of allHouseholds) {
-		const hour = localHour(household.timezone);
-		if (hour < household.reminderHour || hour >= QUIET_FROM) continue;
-
+	for (const household of activeHouseholds) {
 		const today = localToday(household.timezone);
-		const gapCutoff = new Date(Date.now() - REMIND_GAP_HOURS * 3_600_000);
+		const gapCutoff = new Date(
+			Date.now() - (REMIND_GAP_HOURS * 60 - REMIND_GAP_SLACK_MINUTES) * 60_000
+		);
 
 		const dueTasks = await db
 			.select({ task: tasks, area: areas })
