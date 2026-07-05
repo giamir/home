@@ -1,9 +1,12 @@
 /// <reference types="@sveltejs/kit" />
+/// <reference types="../.svelte-kit/ambient.d.ts" />
 /// <reference no-default-lib="true"/>
 /// <reference lib="esnext" />
 /// <reference lib="webworker" />
 
 import { build, files, version } from '$service-worker';
+import { PUBLIC_VAPID_PUBLIC_KEY } from '$env/static/public';
+import { base64ToUint8Array } from '$lib/push-client';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
@@ -84,27 +87,34 @@ sw.addEventListener('notificationclick', (event) => {
 		sw.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clients) => {
 			const existing = clients[0];
 			if (existing) {
-				await existing.focus();
-				existing.navigate(url);
-			} else {
-				await sw.clients.openWindow(url);
+				// focus() can be refused by the UA — that alone shouldn't
+				// swallow the navigation.
+				await existing.focus().catch(() => {});
+				try {
+					// navigate() rejects on clients this worker doesn't
+					// control (e.g. a hard-reloaded page).
+					await existing.navigate(url);
+					return;
+				} catch {
+					// fall through to opening a fresh window
+				}
 			}
+			await sw.clients.openWindow(url);
 		})
 	);
 });
 
 sw.addEventListener('pushsubscriptionchange', ((event: Event) => {
-	// Best-effort resubscribe (spotty support on iOS; expired subscriptions
-	// are cleaned up server-side on 410s either way)
-	const change = event as Event & {
-		oldSubscription?: PushSubscription | null;
-		waitUntil(promise: Promise<unknown>): void;
-	};
+	// Resubscribe with our own VAPID key — oldSubscription is allowed to be
+	// null (iOS rotates subscriptions exactly this way), so its key can't be
+	// relied on. A failure here is recovered on the next app open, when the
+	// layout re-syncs the current subscription with the server.
+	const change = event as Event & { waitUntil(promise: Promise<unknown>): void };
 	change.waitUntil(
 		sw.registration.pushManager
 			.subscribe({
 				userVisibleOnly: true,
-				applicationServerKey: change.oldSubscription?.options.applicationServerKey ?? undefined
+				applicationServerKey: base64ToUint8Array(PUBLIC_VAPID_PUBLIC_KEY)
 			})
 			.then((subscription) =>
 				fetch('/api/push/subscribe', {
@@ -113,6 +123,11 @@ sw.addEventListener('pushsubscriptionchange', ((event: Event) => {
 					body: JSON.stringify(subscription.toJSON())
 				})
 			)
-			.catch(() => {})
+			.then((response) => {
+				// An expired session answers 401 (or, defensively, a redirect).
+				if (!response.ok || response.redirected)
+					throw new Error(`subscribe endpoint returned ${response.status}`);
+			})
+			.catch((error) => console.error('pushsubscriptionchange resubscribe failed:', error))
 	);
 }) as EventListener);

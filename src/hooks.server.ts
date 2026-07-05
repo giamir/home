@@ -1,4 +1,4 @@
-import { redirect, type Handle } from '@sveltejs/kit';
+import { error, redirect, type Handle } from '@sveltejs/kit';
 import {
 	SESSION_COOKIE,
 	deleteSessionTokenCookie,
@@ -32,6 +32,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	if (!event.locals.user && pathname !== '/login') {
+		// APIs must fail loudly: a 302 to the login page reads as a 200 to
+		// fetch() callers like the service worker's push resubscribe.
+		if (pathname.startsWith('/api/')) error(401);
 		redirect(302, '/login');
 	}
 	if (event.locals.user && pathname === '/login') {

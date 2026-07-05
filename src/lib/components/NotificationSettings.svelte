@@ -2,15 +2,9 @@
 	import { onMount } from 'svelte';
 	import { Bell, BellOff, BellRing, Share, SquarePlus } from '@lucide/svelte';
 	import { env } from '$env/dynamic/public';
+	import { base64ToUint8Array, syncPushSubscription } from '$lib/push-client';
 
-	type Status =
-		| 'loading'
-		| 'unsupported'
-		| 'not-installed'
-		| 'denied'
-		| 'off'
-		| 'on'
-		| 'error';
+	type Status = 'loading' | 'unsupported' | 'not-installed' | 'denied' | 'off' | 'on' | 'error';
 
 	let status = $state<Status>('loading');
 	let busy = $state(false);
@@ -30,18 +24,10 @@
 			status = 'denied';
 			return;
 		}
-		const registration = await navigator.serviceWorker.ready;
-		const subscription = await registration.pushManager.getSubscription();
-		status = subscription ? 'on' : 'off';
+		// Re-registers the subscription with the server, so "on" reflects what
+		// the server will actually push to — not just what the browser holds.
+		status = await syncPushSubscription();
 	});
-
-	function base64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
-		const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
-		const raw = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
-		const bytes = new Uint8Array(new ArrayBuffer(raw.length));
-		for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-		return bytes;
-	}
 
 	async function enable() {
 		busy = true;
@@ -53,10 +39,20 @@
 				return;
 			}
 			const registration = await navigator.serviceWorker.ready;
-			const subscription = await registration.pushManager.subscribe({
+			const options = {
 				userVisibleOnly: true,
 				applicationServerKey: base64ToUint8Array(env.PUBLIC_VAPID_PUBLIC_KEY ?? '')
-			});
+			};
+			let subscription: PushSubscription;
+			try {
+				subscription = await registration.pushManager.subscribe(options);
+			} catch (error) {
+				// A leftover subscription made with a different (rotated) VAPID
+				// key blocks subscribing — drop it and retry once.
+				if ((error as Error).name !== 'InvalidStateError') throw error;
+				await (await registration.pushManager.getSubscription())?.unsubscribe();
+				subscription = await registration.pushManager.subscribe(options);
+			}
 			const response = await fetch('/api/push/subscribe', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },

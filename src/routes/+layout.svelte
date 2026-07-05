@@ -3,8 +3,20 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import { House, LayoutGrid, ChartBar, Settings } from '@lucide/svelte';
+	import { syncPushSubscription } from '$lib/push-client';
 
 	let { children, data } = $props();
+
+	// Re-register this device's push subscription once per app open and per
+	// login — self-heals subscriptions the server pruned after failed sends
+	// and moves the device's subscription over when the other partner logs in.
+	let syncedUserId: number | null = null;
+	$effect(() => {
+		if (data?.user && data.user.id !== syncedUserId) {
+			syncedUserId = data.user.id;
+			void syncPushSubscription();
+		}
+	});
 
 	const tabs = [
 		{ href: '/', label: 'Today', icon: House },
